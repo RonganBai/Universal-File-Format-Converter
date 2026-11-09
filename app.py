@@ -9,7 +9,8 @@ import traceback
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint
 from PyQt6.QtGui import QDesktopServices, QIcon, QPixmap, QCursor
 from PyQt6.QtWidgets import (QApplication, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
-                             QPushButton, QStackedWidget, QVBoxLayout, QWidget, QProgressBar, QFrame)
+                             QPushButton, QStackedWidget, QVBoxLayout, QWidget, QProgressBar, QFrame,
+                             QDialog, QCheckBox, QDialogButtonBox, QRadioButton)
 
 import converter
 
@@ -62,6 +63,19 @@ EN = {
     "正在转换": "Converting", "完成：生成 {n} 个文件": "Done: {n} file(s) created",
     "打开所在文件夹": "Open folder", "失败：": "Failed: ",
     "切换语言": "Switch language",
+    "悬浮球设置…": "Floating ball…", "悬浮球设置": "Floating ball settings",
+    "在屏幕边缘显示悬浮球（关闭主窗口后仍常驻）": "Show a floating ball at the screen edge (stays after closing the main window)",
+    "选择常用格式（最多 6 种）：已选 {n}/6": "Pick quick formats (max 6): {n}/6 selected",
+    "确定": "OK", "取消": "Cancel", "打开主窗口": "Open main window", "退出": "Quit",
+    "在屏幕边缘显示悬浮球": "Show a floating ball at the screen edge", "关闭主窗口时：": "When closing the main window:",
+    "完全退出": "Quit completely", "隐藏主窗口，保留悬浮球": "Hide it, keep the floating ball",
+    "拖到格式上": "Drop on a format", "右键设置格式": "Right-click to set formats",
+    "已加入主窗口列表": "Added to main list", "请拖入文件": "Drop files here",
+    "转换中…": "Converting…",
+    "文件转换": "File Convert", "拖入文件": "Drop files", "松开后选择目标格式": "then pick a format",
+    "右键设置常用格式": "Right-click to set formats", "已拖入 {n} 个文件": "{n} file(s) added",
+    "…等 {n} 个": "…{n} in total", "选择要转换成的格式": "Choose a target format",
+    "正在转换为 {f}…": "Converting to {f}…", "完成 {n} 个": "{n} done", "失败 {n} 个": "{n} failed",
     "blocked": "The output folder is blocked by Windows Controlled Folder Access; files were saved to {d}. "
                "Allow this app under Windows Security → Ransomware protection → Allow an app.",
     "blocked_zh": "输出目录被 Windows「受控文件夹访问」拦截，已改存到 {d}。可在 Windows 安全中心 → 勒索软件防护 → 允许应用 中放行本程序。",
@@ -184,6 +198,8 @@ class Main(QWidget):
         global LANG
         LANG = self.cfg.get("lang", "zh")
         self.i18n = []  # (控件, 中文键, 后缀)
+        self.ball = None
+        self.jobs = []
         self.out_root = self.cfg.get("out_root") or DEFAULT_OUT
 
         outer = QVBoxLayout(self)
@@ -204,7 +220,8 @@ class Main(QWidget):
         self.list = QListWidget()
         root.addWidget(self.list, 1)
         row = QHBoxLayout()
-        for text, fn in (("添加文件", self.add_files), ("清空", self.list.clear)):
+        for text, fn in (("添加文件", self.add_files), ("清空", self.list.clear),
+                         ("悬浮球设置…", self.open_ball_settings)):
             b = self.L(QPushButton(), text)
             b.clicked.connect(fn)
             row.addWidget(b)
@@ -283,6 +300,69 @@ class Main(QWidget):
         save_cfg(self.cfg)
         self.i18n = [x for x in self.i18n if x[0] is not self.status] + [(self.status, "就绪", "")]
         self.retranslate()
+        if self.ball:
+            self.ball.rebuild()
+
+    # ---- 悬浮球
+    assets = ASSETS
+    tr = staticmethod(lambda s: tr(s))
+
+    def save(self):
+        save_cfg(self.cfg)
+
+    def apply_ball(self):
+        if self.cfg.get("ball_on"):
+            if not self.ball:
+                import floatball
+                self.ball = floatball.FloatBall(self)
+            self.ball.rebuild()
+            self.ball.show()
+        elif self.ball:
+            self.ball.close()
+            self.ball = None
+
+    def open_ball_settings(self):
+        dlg = BallSettings(self)
+        if dlg.exec():
+            self.cfg["ball_on"] = dlg.chk.isChecked()
+            self.cfg["ball_formats"] = dlg.selected
+            self.cfg["close_action"] = "hide" if dlg.rb_hide.isChecked() else "quit"
+            self.save()
+            self.apply_ball()
+
+    def show_main(self):
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def quit_app(self):
+        """完全退出：关掉悬浮窗，等转换线程结束，再退出事件循环。"""
+        if self.ball:
+            self.ball.close()
+        for j in list(self.jobs) + ([self.worker] if getattr(self, "worker", None) else []):
+            j.wait(3000)
+        QApplication.instance().quit()
+
+    def closeEvent(self, e):
+        # 开着悬浮窗且设置为「隐藏」时，只隐藏主窗口；否则完全退出
+        if self.ball and self.cfg.get("close_action") == "hide":
+            e.ignore()
+            self.hide()
+        else:
+            e.accept()
+            self.quit_app()
+
+    def run_job(self, files, fmt, kind, callback, auto_open=False):
+        job = Worker(files, self.out_root, fmt, kind)
+        self.jobs.append(job)
+
+        def fin(ok, bad):
+            self.jobs.remove(job)
+            if auto_open and ok:
+                os.startfile(os.path.dirname(ok[0]))
+            callback(ok, bad)
+        job.finished_all.connect(fin)
+        job.start()
 
     # ---- 窗口：最大化 / 边缘缩放
     def toggle_max(self):
@@ -403,6 +483,74 @@ class Main(QWidget):
         self.update_dir_label()
 
 
+class BallSettings(QDialog):
+    """悬浮球设置：开关 + 最多 6 种常用格式。"""
+    MAX = 6
+
+    def __init__(self, main):
+        super().__init__(main)
+        self.setWindowTitle(tr("悬浮球设置"))
+        self.setStyleSheet("QDialog{background:#1f1f1f}" "QCheckBox, QRadioButton{color:#e6e6e6}"
+                           "QPushButton#fmt:checked{background:#0a84ff;border-color:#0a84ff;color:white}")
+        self.selected = list(main.cfg.get("ball_formats", []))[:self.MAX]
+        lay = QVBoxLayout(self)
+        self.chk = QCheckBox(tr("在屏幕边缘显示悬浮球"))
+        self.chk.setChecked(bool(main.cfg.get("ball_on")))
+        lay.addWidget(self.chk)
+        crow = QHBoxLayout()
+        crow.addWidget(QLabel(tr("关闭主窗口时：")))
+        self.rb_quit = QRadioButton(tr("完全退出"))
+        self.rb_hide = QRadioButton(tr("隐藏主窗口，保留悬浮球"))
+        (self.rb_hide if main.cfg.get("close_action") == "hide" else self.rb_quit).setChecked(True)
+        crow.addWidget(self.rb_quit)
+        crow.addWidget(self.rb_hide)
+        crow.addStretch()
+        lay.addLayout(crow)
+        self.chk.toggled.connect(self.rb_hide.setEnabled)
+        self.rb_hide.setEnabled(self.chk.isChecked())
+        self.count = QLabel()
+        self.count.setStyleSheet("color:#999")
+        lay.addWidget(self.count)
+        self.btns = []
+        for name, kind, fmts in (("图像", "image", converter.IMAGE_FORMATS), ("文档", "doc", converter.DOC_FORMATS),
+                                 ("向量", "vector", converter.VECTOR_FORMATS)):
+            lay.addWidget(QLabel(tr(name)))
+            g = QGridLayout()
+            g.setSpacing(6)
+            for k, f in enumerate(fmts):
+                b = QPushButton(f, objectName="fmt", checkable=True)
+                b.setMinimumWidth(64)
+                key = f"{kind}:{f}"
+                b.setChecked(key in self.selected)
+                b.toggled.connect(lambda on, key=key, b=b: self.toggle(key, on, b))
+                g.addWidget(b, k // 8, k % 8)
+                self.btns.append(b)
+            lay.addLayout(g)
+        box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        box.button(QDialogButtonBox.StandardButton.Ok).setText(tr("确定"))
+        box.button(QDialogButtonBox.StandardButton.Cancel).setText(tr("取消"))
+        box.accepted.connect(self.accept)
+        box.rejected.connect(self.reject)
+        lay.addWidget(box)
+        self.refresh()
+
+    def toggle(self, key, on, b):
+        if on and key not in self.selected:
+            if len(self.selected) >= self.MAX:
+                b.blockSignals(True)
+                b.setChecked(False)
+                b.blockSignals(False)
+                return
+            self.selected.append(key)
+        elif not on and key in self.selected:
+            self.selected.remove(key)
+        self.refresh()
+
+    def refresh(self):
+        self.count.setText(tr("选择常用格式（最多 6 种）：已选 {n}/6").format(n=len(self.selected))
+                           + ("　" + "  ".join(k.split(":")[1] for k in self.selected) if self.selected else ""))
+
+
 if __name__ == "__main__":
     try:  # 让任务栏使用本程序自己的图标，而不是 Python 的
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("GeShiZhuanHuanQi.App")
@@ -413,5 +561,8 @@ if __name__ == "__main__":
     app.setStyleSheet(QSS)
     w = Main()
     w.add_paths(sys.argv[1:])
+    app.setQuitOnLastWindowClosed(False)
     w.show()
-    sys.exit(app.exec())
+    w.apply_ball()
+    code = app.exec()
+    os._exit(code)  # 直接结束进程，避免后台库线程拖住退出

@@ -1,6 +1,6 @@
 ﻿; 格式转换器 安装包脚本（Inno Setup 6）——由 build.ps1 调用
 #define AppName "格式转换器"
-#define AppVersion "1.0.0"
+#define AppVersion "1.2.1"
 #define AppPublisher "RonganBai"
 #define AppExe "FormatConverter.exe"
 #ifndef DistDir
