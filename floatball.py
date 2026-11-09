@@ -28,6 +28,8 @@ QPushButton#fmt {{ min-width:0; padding:0; background:#333; border:1px solid #47
 QPushButton#fmt:hover {{ background:#0a84ff; border-color:#0a84ff; color:white; }}
 QPushButton#x {{ border:none; color:#aaa; font-size:14px; min-width:22px; max-width:22px; }}
 QPushButton#x:hover {{ color:white; }}
+QPushButton#rm {{ border:none; color:#777; font-size:10px; min-width:18px; max-width:18px; min-height:18px; }}
+QPushButton#rm:hover {{ color:#ff7b72; }}
 """
 
 
@@ -67,13 +69,17 @@ class FloatBall(QWidget):
         head = QHBoxLayout()
         self.count = QLabel(objectName="big")
         head.addWidget(self.count, 1)
+        self.btn_edit = QPushButton("✎", objectName="x")   # 快速编辑常用 6 种格式
+        self.btn_edit.clicked.connect(self.main.open_ball_settings)
+        head.addWidget(self.btn_edit)
         self.btn_x = QPushButton("✕", objectName="x")
         self.btn_x.clicked.connect(self.reset)
         head.addWidget(self.btn_x)
         v.addLayout(head)
-        self.names = QLabel(objectName="sub")
-        self.names.setWordWrap(True)
-        v.addWidget(self.names)
+        self.names = QVBoxLayout()   # 每个文件一行，右侧小 ✕ 可单独移除
+        self.names.setSpacing(0)
+        self.names.setContentsMargins(0, 0, 0, 0)
+        v.addLayout(self.names)
         self.grid = QGridLayout()
         self.grid.setSpacing(6)
         self.grid.setContentsMargins(0, 4, 4, 0)
@@ -115,6 +121,8 @@ class FloatBall(QWidget):
             b.clicked.connect(lambda _, f=fmt, k=kind: self.convert(f, k))
             self.grid.addWidget(b, i // 2, i % 2)
         self.n_fmt = len(keys)
+        self.btn_edit.setToolTip(self.tr("编辑常用格式"))
+        self.btn_x.setToolTip(self.tr("清空文件"))
         self.drop_text.setText(self.tr("拖入文件"))
         self.drop_sub.setText(self.tr("松开后选择目标格式") if keys else self.tr("右键设置常用格式"))
         self.refresh_files()
@@ -123,12 +131,28 @@ class FloatBall(QWidget):
     def refresh_files(self):
         n = len(self.files)
         self.count.setText(self.tr("已拖入 {n} 个文件").format(n=n))
-        shown = [os.path.basename(f) for f in self.files[:3]]
-        fm = QFontMetrics(self.names.font())
-        shown = [fm.elidedText(s, Qt.TextElideMode.ElideMiddle, CHOOSE_W - 30) for s in shown]
-        if n > 3:
-            shown.append(self.tr("…等 {n} 个").format(n=n))
-        self.names.setText("\n".join(shown))
+        while self.names.count():
+            w = self.names.takeAt(0).widget()
+            if w:
+                w.deleteLater()
+        for f in self.files[:4]:
+            row = QWidget()
+            h = QHBoxLayout(row)
+            h.setContentsMargins(0, 0, 0, 0)
+            lb = QLabel(objectName="sub")
+            lb.setText(QFontMetrics(lb.font()).elidedText(os.path.basename(f), Qt.TextElideMode.ElideMiddle,
+                                                          CHOOSE_W - 52))
+            lb.setToolTip(f)
+            h.addWidget(lb, 1)
+            rm = QPushButton("✕", objectName="rm")
+            rm.setToolTip(self.tr("移除"))
+            rm.setEnabled(self.mode == "choose")
+            rm.clicked.connect(lambda _, f=f: self.remove_file(f))
+            h.addWidget(rm)
+            self.names.addWidget(row)
+        if n > 4:
+            more = QLabel(self.tr("…等 {n} 个").format(n=n), objectName="sub")
+            self.names.addWidget(more)
         if not self.busy:
             self.status.setText(self.tr("选择要转换成的格式") if self.n_fmt else self.tr("右键设置常用格式"))
 
@@ -190,7 +214,7 @@ class FloatBall(QWidget):
             self.fx.setOpacity(1.0)
             self.setGeometry(target)
         for b in self.page_choose.findChildren(QPushButton):
-            b.setEnabled(mode == "choose" or b is self.btn_x)
+            b.setEnabled(mode == "choose" or b in (self.btn_x, self.btn_edit))
         self.update()
 
     def expand(self):
@@ -201,6 +225,16 @@ class FloatBall(QWidget):
     def collapse(self):
         if self.mode != "bubble":
             self.apply_mode("bubble")
+
+    def remove_file(self, f):
+        if self.busy or f not in self.files:
+            return
+        self.files.remove(f)
+        if not self.files:
+            self.reset()
+            return
+        self.refresh_files()
+        self.apply_mode("choose")
 
     def reset(self):
         self.files = []

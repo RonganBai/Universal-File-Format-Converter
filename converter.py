@@ -28,6 +28,7 @@ IMAGE_FORMATS = ["PNG", "SVG", "ICO", "JPEG", "WEBP", "BMP", "GIF", "DDS", "CUR"
                  "PPM", "MAP", "PGM", "JIF", "PDB", "RAS"]
 DOC_FORMATS = ["PDF", "DOC", "DOCX", "DOCM", "ODT", "XPS", "RTF", "DOT", "DOTX",
                "DJVU", "DOTM", "ABW", "KWD", "AW", "DBK", "OXPS", "SXW"]
+SHEET_FORMATS = ["XLSX", "XLSM", "CSV"]
 VECTOR_FORMATS = ["SVG", "AI", "PLT", "EPS", "WMF", "SK", "EMF", "FIG", "CGM", "SK1", "PS"]
 
 FONT_PATH = r"C:\Windows\Fonts\msyh.ttc"
@@ -40,12 +41,27 @@ class Content:
     pages: list = field(default_factory=list)     # 用于输出图像格式的整页图像
     text: list = field(default_factory=list)      # 段落文字
     pictures: list = field(default_factory=list)  # 嵌入文档的图片
+    blocks: list = field(default_factory=list)    # 按顺序的 ("p", 文本) / ("table", 行列表)，保留表格结构
+
+    def doc_blocks(self):
+        return self.blocks or [("p", t) for t in self.text]
 
     def page_images(self):
         if self.pages:
             return self.pages
         if self.pictures:
             return self.pictures
+        if any(k == "table" for k, _ in self.blocks):
+            import pymupdf
+            tmp = os.path.join(tempfile.mkdtemp(), "t.pdf")
+            write_pdf(self, tmp)
+            out = []
+            for i, pg in enumerate(pymupdf.open(tmp)):
+                if i >= 200:
+                    break
+                pix = pg.get_pixmap(dpi=150)
+                out.append(Image.frombytes("RGB", (pix.width, pix.height), pix.samples))
+            return out
         return render_text_pages(self.text or [self.title])
 
     def doc_pictures(self):
@@ -64,6 +80,74 @@ def _rgb(img: Image.Image) -> Image.Image:
         a = (a - a.min()) / max(a.max() - a.min(), 1e-9) * 255
         return Image.fromarray(a.astype(np.uint8)).convert("RGB")
     return img.convert("RGBA" if "A" in img.getbands() or img.mode == "P" else "RGB")
+
+
+def _pdf_page_blocks(page):
+    """识别 PDF 页面中的表格；表格以外的文字按位置顺序作为段落。"""
+    try:
+        tables = page.find_tables().tables
+    except Exception:
+        tables = []
+    items, boxes = [], [tuple(t.bbox) for t in tables]
+    for t, box in zip(tables, boxes):
+        rows = [[None if x is None else x.strip() for x in r] for r in t.extract()]
+        rows = [r for r in rows if any(x for x in r)]
+        if rows:
+            items.append((box[1], ("table", rows)))
+    for x0, y0, x1, y1, txt, *_ in page.get_text("blocks"):
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        if any(b[0] <= cx <= b[2] and b[1] <= cy <= b[3] for b in boxes):
+            continue
+        for ln in txt.splitlines():
+            if ln.strip():
+                items.append((y0, ("p", ln.strip())))
+    items.sort(key=lambda it: it[0])
+    return [b for _, b in items]
+
+
+def _cell_str(v):
+    if v is None:
+        return ""
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    if hasattr(v, "strftime"):
+        return v.strftime("%Y-%m-%d %H:%M" if getattr(v, "hour", 0) or getattr(v, "minute", 0) else "%Y-%m-%d")
+    return str(v)
+
+
+def _sheet_rows(ws):
+    """工作表 → 行列表；横向合并单元格的后续格记为 None，去掉末尾空行空列。"""
+    merged = {}
+    for mr in ws.merged_cells.ranges:
+        for r in range(mr.min_row, mr.max_row + 1):
+            for col in range(mr.min_col, mr.max_col + 1):
+                if (r, col) != (mr.min_row, mr.min_col):
+                    merged[(r, col)] = r == mr.min_row  # 同一行内的合并 → None
+    rows = []
+    for r, row in enumerate(ws.iter_rows(values_only=True), 1):
+        out = []
+        for col, v in enumerate(row, 1):
+            m = merged.get((r, col))
+            out.append(None if m else ("" if m is False else _cell_str(v)))
+        rows.append(out)
+    while rows and not any(x for x in rows[-1]):
+        rows.pop()
+    ncol = max((max((i + 1 for i, x in enumerate(r) if x), default=0) for r in rows), default=0)
+    rows = [r[:ncol] for r in rows]
+    return rows if ncol else []
+
+
+def _merge_spans(row, ncol):
+    """把一行展开为 [(起始列, 结束列, 文本)]；None 表示与左侧单元格合并。"""
+    row = list(row) + [""] * (ncol - len(row))
+    out, j = [], 0
+    while j < ncol:
+        k = j + 1
+        while k < ncol and row[k] is None:
+            k += 1
+        out.append((j, k - 1, row[j] or ""))
+        j = k
+    return out
 
 
 def _decode_text(data: bytes):
@@ -108,11 +192,35 @@ def load(path: str) -> Content:
             mode = "RGBA" if pix.alpha else "RGB"
             c.pages.append(Image.frombytes(mode, (pix.width, pix.height), pix.samples))
             c.text += [p for p in page.get_text().split("\n") if p.strip()]
+            if ext != "svg":
+                c.blocks += _pdf_page_blocks(page)
         if ext == "svg":
             c.pictures, c.text = c.pages, []
         return c
 
-    # 2) Word 系列
+    # 2) 表格：Excel / CSV
+    if ext in ("xlsx", "xlsm", "xltx", "xltm"):
+        import openpyxl
+        wb = openpyxl.load_workbook(path, data_only=True)  # 公式取计算后的值
+        for ws in wb.worksheets:
+            rows = _sheet_rows(ws)
+            if not rows:
+                continue
+            if len(wb.worksheets) > 1:
+                c.blocks.append(("p", ws.title))
+            c.blocks.append(("table", rows))
+            c.text += ["\t".join(x or "" for x in r) for r in rows]
+        return c
+    if ext in ("csv", "tsv"):
+        import csv
+        with open(path, "rb") as f:
+            txt = _decode_text(f.read()) or ""
+        rows = list(csv.reader(io.StringIO(txt), delimiter="\t" if ext == "tsv" else ","))
+        c.blocks = [("table", rows)] if rows else []
+        c.text = ["\t".join(r) for r in rows]
+        return c
+
+    # 2b) Word 系列
     if ext in ("docx", "docm", "dotx", "dotm"):
         import docx
         buf = io.BytesIO()  # python-docx 只认 .docx 内容类型，宏/模板版需改写后读取
@@ -124,10 +232,19 @@ def load(path: str) -> Content:
                         data = data.replace(ct.encode(), DOCX_CT["DOCX"].encode())
                 zo.writestr(it, data)
         d = docx.Document(buf)
-        c.text = [p.text for p in d.paragraphs if p.text.strip()]
-        for t in d.tables:
-            for row in t.rows:
-                c.text.append(" | ".join(cell.text for cell in row.cells))
+        from docx.table import Table
+        from docx.text.paragraph import Paragraph
+        for el in d.element.body.iterchildren():  # 按文档顺序读取段落与表格
+            tag = el.tag.rsplit("}", 1)[-1]
+            if tag == "p":
+                t = Paragraph(el, d).text
+                if t.strip():
+                    c.blocks.append(("p", t))
+                    c.text.append(t)
+            elif tag == "tbl":
+                rows = [[cell.text for cell in row.cells] for row in Table(el, d).rows]
+                c.blocks.append(("table", rows))
+                c.text += [" | ".join(r) for r in rows]
         for rel in d.part.rels.values():
             if "image" in rel.reltype:
                 try:
@@ -477,31 +594,80 @@ def _limit(img, maxw=1600):
     return img
 
 
+def _wrap(font, text, fs, width):
+    lines = []
+    for para in (text or "").split("\n"):
+        cur = ""
+        for ch in para:
+            if cur and font.text_length(cur + ch, fs) > width:
+                lines.append(cur)
+                cur = ch
+            else:
+                cur += ch
+        lines.append(cur)
+    return lines
+
+
 def write_pdf(c, path):
     import pymupdf
     doc = pymupdf.open()
     font = pymupdf.Font("china-s")
-    fs, lh = 11, 17
-    W, H, M = 595, 842, 56
-    if c.text:
-        page, y = None, H
-        for para in c.text:
-            lines, cur = [], ""
-            for ch in para:
-                if font.text_length(cur + ch, fs) > W - 2 * M:
-                    lines.append(cur)
-                    cur = ch
-                else:
-                    cur += ch
-            lines.append(cur)
-            for ln in lines:
-                if y + lh > H - M:
-                    page = doc.new_page(width=W, height=H)
-                    page.insert_font(fontname="cs", fontbuffer=font.buffer)
-                    y = M
+    blocks = c.doc_blocks()
+    widest = max((max(len(r) for r in v) for k, v in blocks if k == "table" and v), default=0)
+    W, H = (842, 595) if widest > 6 else (595, 842)  # 列多时用横向页面
+    M = 40
+    st = {"page": None, "y": H}
+
+    def new_page():
+        st["page"] = doc.new_page(width=W, height=H)
+        st["page"].insert_font(fontname="cs", fontbuffer=font.buffer)
+        st["y"] = M
+
+    def need(h):
+        if st["page"] is None or st["y"] + h > H - M:
+            new_page()
+
+    for kind, v in blocks:
+        if kind == "p":
+            fs, lh = 11, 17
+            for ln in _wrap(font, v, fs, W - 2 * M):
+                need(lh)
                 if ln:
-                    page.insert_text((M, y + fs), ln, fontname="cs", fontsize=fs)
-                y += lh
+                    st["page"].insert_text((M, st["y"] + fs), ln, fontname="cs", fontsize=fs)
+                st["y"] += lh
+            continue
+        if not v:
+            continue
+        ncol = max(len(r) for r in v)
+        fs = 9 if ncol <= 8 else 7.5 if ncol <= 14 else 6
+        lh, pad = fs * 1.35, 3
+        # 列宽：按每列最长内容分配，限制单列不超过总宽的 40%
+        need_w = [0.0] * ncol
+        for r in v:
+            for j, k, val in _merge_spans(r, ncol):
+                if j == k:
+                    longest = max((font.text_length(x, fs) for x in val.split("\n")), default=0)
+                    need_w[j] = max(need_w[j], longest + 2 * pad)
+        total = W - 2 * M
+        need_w = [min(max(x, 24), total * 0.4) for x in need_w]
+        scale = total / sum(need_w)
+        cw = [x * scale for x in need_w]
+        xs = [M]
+        for x in cw:
+            xs.append(xs[-1] + x)
+        for r in v:
+            spans = _merge_spans(r, ncol)
+            cells = [(xs[j], xs[k + 1], _wrap(font, val, fs, xs[k + 1] - xs[j] - 2 * pad)) for j, k, val in spans]
+            rh = max(len(ls) for _, _, ls in cells) * lh + 2 * pad
+            need(rh)
+            pg, y = st["page"], st["y"]
+            for x0, x1, ls in cells:
+                pg.draw_rect(pymupdf.Rect(x0, y, x1, y + rh), color=(0, 0, 0), width=0.5)
+                for i, ln in enumerate(ls):
+                    if ln:
+                        pg.insert_text((x0 + pad, y + pad + fs + i * lh), ln, fontname="cs", fontsize=fs)
+            st["y"] += rh
+        st["y"] += 10
     for img in c.doc_pictures():
         page = doc.new_page(width=W, height=H)
         r = pymupdf.Rect(M, M, W - M, H - M)
@@ -530,8 +696,20 @@ def write_docx(c, path, fmt="DOCX"):
     st.font.name = "微软雅黑"
     st.font.size = Pt(10.5)
     st.element.rPr.rFonts.set(qn("w:eastAsia"), "微软雅黑")
-    for t in c.text:
-        d.add_paragraph(t)
+    for kind, v in c.doc_blocks():
+        if kind == "p":
+            d.add_paragraph(v)
+            continue
+        ncol = max(len(r) for r in v)
+        tb = d.add_table(rows=len(v), cols=ncol)
+        tb.style = "Table Grid"
+        for i, row in enumerate(v):
+            for j, k, val in _merge_spans(row, ncol):
+                cell = tb.cell(i, j)
+                if k > j:
+                    cell = cell.merge(tb.cell(i, k))
+                cell.text = val
+        d.add_paragraph()
     for img in c.doc_pictures():
         img = _limit(img)
         w_in = min(6.0, img.width / 96)
@@ -557,8 +735,19 @@ def _rtf_escape(s):
 
 def write_rtf(c, path):
     parts = [r"{\rtf1\ansi\ansicpg936\deff0{\fonttbl{\f0\fnil\fcharset134 Microsoft YaHei;}}\f0\fs21 "]
-    for t in c.text:
-        parts.append(_rtf_escape(t) + r"\par" + "\n")
+    for kind, v in c.doc_blocks():
+        if kind == "p":
+            parts.append(_rtf_escape(v) + r"\par" + "\n")
+            continue
+        ncol = max(len(r) for r in v)
+        cw = 9600 // ncol
+        border = r"\clbrdrt\brdrs\brdrw10\clbrdrl\brdrs\brdrw10\clbrdrb\brdrs\brdrw10\clbrdrr\brdrs\brdrw10"
+        for row in v:
+            spans = _merge_spans(row, ncol)
+            defs = "".join(border + r"\cellx%d" % (cw * (k + 1)) for j, k, _ in spans)
+            cells = "".join(r"\pard\intbl " + _rtf_escape(val).replace("\n", r"\line ") + r"\cell " for _, _, val in spans)
+            parts.append(r"\trowd\trgaph80" + defs + cells + r"\row" + "\n")
+        parts.append(r"\pard\par" + "\n")
     for img in c.doc_pictures():
         img = _limit(img, 1200)
         w_tw = int(min(6.0, img.width / 96) * 1440)
@@ -610,8 +799,30 @@ def write_odt(c, path):
     s.addElement(TextProperties(fontname="Microsoft YaHei", fontnameasian="Microsoft YaHei",
                                 fontsize="10.5pt", fontsizeasian="10.5pt"))
     d.styles.addElement(s)
-    for t in c.text:
-        d.text.addElement(P(stylename=s, text=t))
+    from odf.table import Table, TableColumn, TableRow, TableCell, CoveredTableCell
+    from odf.style import TableCellProperties
+    cs = Style(name="Cell", family="table-cell")
+    cs.addElement(TableCellProperties(border="0.5pt solid #000000", padding="0.05cm"))
+    d.automaticstyles.addElement(cs)
+    for kind, v in c.doc_blocks():
+        if kind == "p":
+            d.text.addElement(P(stylename=s, text=v))
+            continue
+        ncol = max(len(r) for r in v)
+        tb = Table()
+        tb.addElement(TableColumn(numbercolumnsrepeated=ncol))
+        for row in v:
+            tr_ = TableRow()
+            for j, k, val in _merge_spans(row, ncol):
+                cell = TableCell(stylename=cs, valuetype="string", numbercolumnsspanned=k - j + 1)
+                for ln in val.split("\n"):
+                    cell.addElement(P(stylename=s, text=ln))
+                tr_.addElement(cell)
+                for _ in range(k - j):
+                    tr_.addElement(CoveredTableCell())
+            tb.addElement(tr_)
+        d.text.addElement(tb)
+        d.text.addElement(P(stylename=s, text=""))
     for i, img in enumerate(c.doc_pictures()):
         img = _limit(img)
         href = d.addPicture(f"Pictures/img{i}.png", "image/png", _png_bytes(img))
@@ -761,6 +972,79 @@ def write_sxw(c, path):
         z.writestr("META-INF/manifest.xml", manifest)
 
 
+def _tables_for_sheet(c):
+    """内容 → [(工作表名, 行列表)]；表格逐个成表，表格外的文字单独放一张「文本」表。"""
+    sheets, texts = [], []
+    for kind, v in c.doc_blocks():
+        if kind == "table":
+            sheets.append((f"表{len(sheets) + 1}", v))
+        else:
+            texts.append([v])
+    if texts:
+        sheets.append(("文本", texts))
+    return sheets or [("Sheet1", [[c.title]])]
+
+
+def write_sheet(c, path, fmt):
+    sheets = _tables_for_sheet(c)
+    if fmt == "CSV":
+        import csv
+        rows = []
+        for i, (name, v) in enumerate(sheets):
+            if i:
+                rows.append([])
+            rows += [[x or "" for x in r] for r in v]
+        with open(path, "w", encoding="utf-8-sig", newline="") as f:
+            csv.writer(f).writerows(rows)
+        return
+    import openpyxl
+    from openpyxl.styles import Alignment, Border, Side, Font
+    from openpyxl.utils import get_column_letter
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+    thin = Side(style="thin", color="000000")
+    for name, v in sheets:
+        ws = wb.create_sheet(name[:31])
+        ncol = max(len(r) for r in v)
+        widths = [8] * ncol
+        for i, r in enumerate(v, 1):
+            for j, k, val in _merge_spans(r, ncol):
+                cell = ws.cell(i, j + 1)
+                num = val.replace(",", "")
+                try:  # 数字按数字写入，便于在 Excel 里计算
+                    cell.value = int(num) if num.isdigit() else float(num) if num.replace(".", "", 1).lstrip("-").isdigit() else val
+                except ValueError:
+                    cell.value = val
+                cell.alignment = Alignment(wrap_text=True, vertical="center")
+                cell.font = Font(name="微软雅黑", size=10)
+                if name != "文本":
+                    for col in range(j + 1, k + 2):
+                        ws.cell(i, col).border = Border(left=thin, right=thin, top=thin, bottom=thin)
+                if k > j:
+                    ws.merge_cells(start_row=i, start_column=j + 1, end_row=i, end_column=k + 1)
+                    cell.alignment = Alignment(wrap_text=True, vertical="center", horizontal="center")
+                else:
+                    longest = max((sum(2 if ord(ch) > 0x2E80 else 1 for ch in ln) for ln in val.split("\n")), default=0)
+                    widths[j] = max(widths[j], min(longest + 2, 60))
+        for j, w in enumerate(widths, 1):
+            ws.column_dimensions[get_column_letter(j)].width = w
+    buf = io.BytesIO()
+    wb.save(buf)
+    data = buf.getvalue()
+    if fmt == "XLSM":  # 启用宏的工作簿：内容类型必须是 macroEnabled，否则 Excel 拒绝打开
+        src, out = zipfile.ZipFile(io.BytesIO(data)), io.BytesIO()
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+            for it in src.infolist():
+                b = src.read(it)
+                if it.filename == "[Content_Types].xml":
+                    b = b.replace(b"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+                                  b"application/vnd.ms-excel.sheet.macroEnabled.main+xml")
+                z.writestr(it, b)
+        data = out.getvalue()
+    with open(path, "wb") as f:
+        f.write(data)
+
+
 def write_document(c, out_base, fmt):
     path = out_base + "." + fmt.lower()
     if fmt == "PDF":
@@ -802,10 +1086,14 @@ def _unique_base(out_dir, title, ext):
 def convert(src, out_dir, fmt, kind=None):
     """kind 为 "image" / "doc" / "vector"；SVG 同时出现在图像与向量两类里，用 kind 区分。"""
     c = load(src)
-    kind = kind or ("image" if fmt in IMAGE_FORMATS else "doc" if fmt in DOC_FORMATS else "vector")
+    kind = kind or ("image" if fmt in IMAGE_FORMATS else "doc" if fmt in DOC_FORMATS
+                    else "sheet" if fmt in SHEET_FORMATS else "vector")
     base = _unique_base(out_dir, c.title, ext_of(fmt))
     if kind == "image":
         return write_images(c, base, fmt)
+    if kind == "sheet":
+        write_sheet(c, base + ext_of(fmt), fmt)
+        return [base + ext_of(fmt)]
     if kind == "vector":
         import vector
         return vector.write_vector(c, base, fmt, src)
