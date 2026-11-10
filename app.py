@@ -8,8 +8,8 @@ import time
 import traceback
 import zipfile
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint, QTimer, QMimeData, QFileInfo, QSize
-from PyQt6.QtGui import QDesktopServices, QIcon, QPixmap, QKeySequence, QShortcut, QAction
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtProperty, QPropertyAnimation, QUrl, QPoint, QTimer, QMimeData, QFileInfo, QSize
+from PyQt6.QtGui import QPainter, QColor, QDesktopServices, QIcon, QPixmap, QKeySequence, QShortcut, QAction
 from PyQt6.QtWidgets import (QApplication, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
                              QPushButton, QStackedWidget, QVBoxLayout, QWidget, QProgressBar, QFrame,
                              QDialog, QCheckBox, QDialogButtonBox, QRadioButton, QSystemTrayIcon, QMenu,
@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (QApplication, QFileDialog, QGridLayout, QHBoxLayout
 
 import converter
 
-VERSION = "1.4.2"
+VERSION = "1.5.0"
 HERE = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__))
 ASSETS = os.path.join(getattr(sys, "_MEIPASS", HERE), "assets")
 CONFIG = os.path.join(os.environ.get("APPDATA", HERE), "格式转换器", "config.json")
@@ -38,6 +38,8 @@ QWidget { color:#e6e6e6; font-family:"Microsoft YaHei UI"; font-size:13px; }
 #title QPushButton:hover { background:#333; }
 #title QPushButton#lang { font-family:"Microsoft YaHei UI"; font-size:12px; min-width:52px; max-width:52px; color:#cfcfcf; }
 #title QPushButton#close:hover { background:#c42b1c; color:white; }
+QPushButton#tool { background:transparent; border:1px solid #3a3a3a; padding:4px 12px; border-radius:14px; }
+QPushButton#tool:hover { background:#2f2f2f; border-color:#0a84ff; }
 #card { background:#242424; border:1px solid #343434; border-radius:10px; }
 #card[hl="true"] { border:2px solid #0a84ff; }
 #cardTitle { font-size:14px; font-weight:bold; color:#ffffff; }
@@ -95,7 +97,12 @@ EN = {
     "右键设置常用格式": "Right-click to set formats", "已拖入 {n} 个文件": "{n} file(s) added",
     "…等 {n} 个": "…{n} in total", "选择要转换成的格式": "Choose a target format",
     "正在转换为 {f}…": "Converting to {f}…", "完成 {n} 个": "{n} done", "失败 {n} 个": "{n} failed",
-    "移除": "Remove", "编辑常用格式": "Edit quick formats", "清空文件": "Clear files",
+    "移除": "Remove",
+    "悬浮球": "Floating ball", "常用格式…": "Quick formats…", "常用格式设置": "Quick format settings", "设置": "Settings",
+    "关闭格式转换器": "Close Format Converter", "点击 ✕ 关闭窗口时，你希望：": "When you click ✕ to close the window:",
+    "此选择会被记住，之后可在主页「设置」中修改。": "Your choice is remembered; change it later under “Settings”.",
+    "隐藏到系统托盘": "Hide to system tray", "点击 ✕ 关闭主窗口时：": "When clicking ✕ on the main window:",
+    "隐藏到系统托盘（悬浮球与托盘继续可用）": "Hide to the system tray (ball and tray stay available)", "编辑常用格式": "Edit quick formats", "清空文件": "Clear files",
     # 模块
     "① 输入文件": "① Input files", "② 目标格式": "② Target format", "③ 转换结果": "③ Results",
     "拖入文件或文件夹到窗口任意位置（可多选，Delete 键移除）":
@@ -130,7 +137,7 @@ GUIDE = {
         ("① 输入文件", "把文件或文件夹拖到窗口任意位置，或点「添加文件」。支持多选，选中后按 Delete 或「移除所选」可删掉。", "in"),
         ("② 目标格式", "左侧选分类（图像 / 文档 / 表格 / 向量），右侧点一个格式，列表里的全部文件会一起转换。", "fmt"),
         ("③ 转换结果", "转换好的文件显示在这里：双击直接打开，多选后可批量打开、定位到文件夹或分享。", "out"),
-        ("悬浮球与托盘", "在「悬浮球设置」里开启屏幕边缘悬浮球，把文件拖到气泡上就能快速转换。"
+        ("悬浮球与托盘", "用主页左上角的「悬浮球」开关开启屏幕边缘悬浮球，把文件拖到气泡上就能快速转换。"
                          "关闭窗口时程序可隐藏到右下角托盘，右键托盘图标即可打开各项功能。标题栏的「?」随时查看帮助。", None),
     ],
     "en": [
@@ -141,7 +148,7 @@ GUIDE = {
         ("② Target format", "Pick a category on the left (Image / Document / Spreadsheet / Vector), then click a format. "
                             "Every file in the list is converted.", "fmt"),
         ("③ Results", "Converted files appear here. Double-click to open; multi-select to open, locate or share.", "out"),
-        ("Floating ball & tray", "Turn on the screen-edge floating ball in “Floating ball…” and drop files on it for quick "
+        ("Floating ball & tray", "Turn on the screen-edge floating ball with the “Floating ball” switch on the main page and drop files on it for quick "
                                  "conversions. When the window is closed the app can hide in the system tray — right-click "
                                  "its icon for quick actions. Click “?” in the title bar for help at any time.", None),
     ],
@@ -172,15 +179,15 @@ HELP_ZH = """
 <li>同名文件不会被覆盖，会自动加序号。</li>
 <li>如果输出目录被 Windows「受控文件夹访问」拦截，会改存到「下载\\格式转换输出」并提示。</li></ul>
 <h3>6. 悬浮球</h3>
-<ul><li>在「悬浮球设置…」中开启，可吸附在屏幕左、右、顶部边缘，拖动即可换位置。</li>
+<ul><li>用主页工具栏的「悬浮球」滑块开关开启或关闭，「常用格式…」选择最多 6 种格式；悬浮球可吸附在屏幕左、右、顶部边缘，拖动即可换位置。</li>
 <li>把文件拖到气泡上 → 显示已拖入的文件，每个文件右侧的 ✕ 可单独移除 → 点击常用格式即转换，完成后自动打开输出文件夹。</li>
 <li>选择格式时点 <b>✎</b> 可快速编辑常用的 6 种格式；右上角 ✕ 清空已拖入文件。</li>
 <li>右键悬浮球可打开主窗口、设置、输出文件夹或退出。</li></ul>
 <h3>7. 系统托盘</h3>
 <ul><li>程序运行时右下角托盘会显示图标，单击 / 双击打开主窗口，右键可快速添加文件、打开输出文件夹、开关悬浮球、查看引导与帮助、退出。</li>
-<li>开启悬浮球并把「关闭主窗口时」设为「隐藏到系统托盘」后，点 ✕ 只会隐藏窗口；否则会完全退出。</li></ul>
+<li>第一次点 ✕ 时会询问「完全退出」还是「隐藏到系统托盘」，之后按你的选择执行，可在主页「设置」中修改。</li></ul>
 <h3>8. 其他</h3>
-<ul><li>标题栏「EN / 中文」切换语言，「?」打开本手册，托盘菜单「使用引导」可重新查看新手引导。</li>
+<ul><li>标题栏「EN / 中文」切换语言；主页工具栏的「使用引导」「帮助手册」「设置」随时可用（F1 也可打开本手册）。</li>
 <li>设置保存在 <code>%APPDATA%\\格式转换器\\config.json</code>。</li></ul>
 """
 
@@ -209,15 +216,15 @@ HELP_EN = """
 <li>Existing files are never overwritten — a number is appended.</li>
 <li>If Windows Controlled Folder Access blocks the folder, files go to <code>Downloads\\格式转换输出</code> instead.</li></ul>
 <h3>6. Floating ball</h3>
-<ul><li>Enable it in “Floating ball…”. It docks to the left, right or top edge — drag it to move.</li>
+<ul><li>Turn it on or off with the “Floating ball” switch in the toolbar and pick up to 6 formats in “Quick formats…”. It docks to the left, right or top edge — drag it to move.</li>
 <li>Drop files on the bubble → the files are listed (✕ next to each removes it) → click a quick format; the output folder opens when done.</li>
 <li>Click <b>✎</b> while choosing to edit the 6 quick formats; the top-right ✕ clears the dropped files.</li>
 <li>Right-click the ball for the main window, settings, output folder or Quit.</li></ul>
 <h3>7. System tray</h3>
 <ul><li>A tray icon appears while the app runs. Click it to open the window; right-click to add files, open the output folder, toggle the ball, see the tour / help, or quit.</li>
-<li>With the ball on and “When closing” set to hide, ✕ only hides the window; otherwise the app quits.</li></ul>
+<li>The first time you click ✕ you are asked whether to quit or hide to the tray; the choice is remembered and can be changed in “Settings”.</li></ul>
 <h3>8. Misc</h3>
-<ul><li>“EN / 中文” switches the language, “?” opens this manual, and “Quick tour” in the tray menu replays the tour.</li>
+<ul><li>“EN / 中文” switches the language; “Quick tour”, “Help manual” and “Settings” are in the main toolbar (F1 opens this manual).</li>
 <li>Settings live in <code>%APPDATA%\\格式转换器\\config.json</code>.</li></ul>
 """
 
@@ -393,6 +400,25 @@ class Main(QWidget):
         root = QVBoxLayout(body)
         root.setContentsMargins(12, 4, 12, 12)
         root.setSpacing(10)
+
+        tb = QHBoxLayout()
+        tb.setSpacing(8)
+        self.ball_switch = Switch()
+        self.ball_switch.setChecked(bool(self.cfg.get("ball_on")))
+        self.ball_switch.toggled.connect(self.set_ball)
+        tb.addWidget(self.ball_switch)
+        lb = self.L(QLabel(), "悬浮球")
+        lb.mousePressEvent = lambda e: self.ball_switch.toggle()
+        tb.addWidget(lb)
+        b = self.L(QPushButton(objectName="tool"), "常用格式…")
+        b.clicked.connect(self.open_ball_settings)
+        tb.addWidget(b)
+        tb.addStretch()
+        for text, fn in (("使用引导", self.open_guide), ("帮助手册", self.open_help), ("设置", self.open_settings)):
+            b = self.L(QPushButton(objectName="tool"), text)
+            b.clicked.connect(fn)
+            tb.addWidget(b)
+        root.addLayout(tb)
 
         top = QHBoxLayout()
         top.setSpacing(10)
@@ -575,7 +601,7 @@ class Main(QWidget):
         a.setChecked(bool(self.cfg.get("ball_on")))
         a.toggled.connect(self.set_ball)
         m.addAction(a)
-        m.addAction(tr("悬浮球设置…"), self.open_ball_settings)
+        m.addAction(tr("常用格式…"), self.open_ball_settings)
         m.addSeparator()
         m.addAction(tr("使用引导"), lambda: (self.show_main(), self.open_guide()))
         m.addAction(tr("帮助手册"), self.open_help)
@@ -584,10 +610,20 @@ class Main(QWidget):
         self.tray.setToolTip(f"{tr('格式转换器')} v{VERSION}")
 
     def set_ball(self, on):
+        if bool(self.cfg.get("ball_on")) == on and (self.ball is not None) == on:
+            return
         self.cfg["ball_on"] = on
         self.save()
         self.apply_ball()
+        if self.ball_switch.isChecked() != on:
+            self.ball_switch.setChecked(on)
         self.build_tray_menu()
+
+    def open_settings(self):
+        dlg = SettingsDialog(self)
+        if dlg.exec():
+            self.cfg["close_choice"] = "hide" if dlg.rb_hide.isChecked() else "quit"
+            self.save()
 
     # ---- 引导 / 帮助
     def open_guide(self):
@@ -620,9 +656,7 @@ class Main(QWidget):
     def open_ball_settings(self):
         dlg = BallSettings(self)
         if dlg.exec():
-            self.cfg["ball_on"] = dlg.chk.isChecked()
             self.cfg["ball_formats"] = dlg.selected
-            self.cfg["close_action"] = "hide" if dlg.rb_hide.isChecked() else "quit"
             self.save()
             self.apply_ball()
             self.build_tray_menu()
@@ -642,8 +676,16 @@ class Main(QWidget):
         QApplication.instance().quit()
 
     def closeEvent(self, e):
-        # 开着悬浮窗且设置为「隐藏」时，缩到系统托盘；否则完全退出
-        if self.ball and self.cfg.get("close_action") == "hide":
+        # 第一次点 ✕ 询问，之后按记住的选择：隐藏到系统托盘 / 完全退出
+        choice = self.cfg.get("close_choice")
+        if choice not in ("hide", "quit"):
+            choice = CloseAsk(self).ask()
+            if not choice:
+                e.ignore()
+                return
+            self.cfg["close_choice"] = choice
+            self.save()
+        if choice == "hide":
             e.ignore()
             self.hide()
             if not self.cfg.get("tray_tip_shown"):
@@ -952,6 +994,95 @@ class StyledDialog(QDialog):
             self.titlebar.btn_lang.setToolTip(tr("切换语言"))
 
 
+class Switch(QCheckBox):
+    """滑块开关。"""
+    def __init__(self):
+        super().__init__()
+        self.setFixedSize(40, 22)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._x = 0.0
+        self.anim = QPropertyAnimation(self, b"knob", self)
+        self.anim.setDuration(140)
+        self.toggled.connect(self._go)
+
+    def _go(self, on):
+        self.anim.stop()
+        self.anim.setStartValue(self._x)
+        self.anim.setEndValue(1.0 if on else 0.0)
+        self.anim.start()
+
+    def get_knob(self):
+        return self._x
+
+    def set_knob(self, v):
+        self._x = v
+        self.update()
+
+    knob = pyqtProperty(float, get_knob, set_knob)
+
+    def hitButton(self, pos):
+        return self.rect().contains(pos)
+
+    def paintEvent(self, e):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(Qt.PenStyle.NoPen)
+        off, on = QColor("#4a4a4a"), QColor("#0a84ff")
+        t = self._x
+        p.setBrush(QColor(int(off.red() + (on.red() - off.red()) * t), int(off.green() + (on.green() - off.green()) * t),
+                          int(off.blue() + (on.blue() - off.blue()) * t)))
+        p.drawRoundedRect(self.rect(), 11, 11)
+        p.setBrush(QColor("white"))
+        p.drawEllipse(int(3 + t * (self.width() - 22)), 3, 16, 16)
+
+
+class CloseAsk(StyledDialog):
+    """第一次点 ✕ 时询问关闭方式。"""
+    def __init__(self, main):
+        super().__init__(main, "关闭格式转换器")
+        self.choice = None
+        v = self.content
+        v.setContentsMargins(22, 10, 22, 16)
+        v.addWidget(QLabel(tr("点击 ✕ 关闭窗口时，你希望：")))
+        v.addWidget(QLabel(tr("此选择会被记住，之后可在主页「设置」中修改。"), objectName="hint"))
+        h = QHBoxLayout()
+        h.addStretch()
+        for key, text, obj in (("quit", "完全退出", ""), ("hide", "隐藏到系统托盘", "primary")):
+            b = QPushButton(tr(text), objectName=obj)
+            b.clicked.connect(lambda _, k=key: (setattr(self, "choice", k), self.accept()))
+            h.addWidget(b)
+        v.addSpacing(8)
+        v.addLayout(h)
+
+    def ask(self):
+        self.exec()
+        return self.choice
+
+
+class SettingsDialog(StyledDialog):
+    def __init__(self, main):
+        super().__init__(main, "设置")
+        self.setStyleSheet("QRadioButton{color:#e6e6e6}")
+        v = self.content
+        v.setContentsMargins(22, 10, 22, 16)
+        v.addWidget(QLabel(tr("点击 ✕ 关闭主窗口时：")))
+        self.rb_quit = QRadioButton(tr("完全退出"))
+        self.rb_hide = QRadioButton(tr("隐藏到系统托盘（悬浮球与托盘继续可用）"))
+        (self.rb_hide if main.cfg.get("close_choice") == "hide" else self.rb_quit).setChecked(True)
+        v.addWidget(self.rb_quit)
+        v.addWidget(self.rb_hide)
+        v.addSpacing(10)
+        h = QHBoxLayout()
+        h.addStretch()
+        c = QPushButton(tr("取消"))
+        c.clicked.connect(self.reject)
+        ok = QPushButton(tr("确定"), objectName="primary")
+        ok.clicked.connect(self.accept)
+        h.addWidget(c)
+        h.addWidget(ok)
+        v.addLayout(h)
+
+
 class HelpDialog(StyledDialog):
     def __init__(self, main):
         super().__init__(main, "帮助手册")
@@ -1035,29 +1166,15 @@ class Guide(StyledDialog):
 
 
 class BallSettings(StyledDialog):
-    """悬浮球设置：开关 + 最多 6 种常用格式。"""
+    """常用格式设置：最多 6 种。"""
     MAX = 6
 
     def __init__(self, main):
-        super().__init__(main, "悬浮球设置")
+        super().__init__(main, "常用格式设置")
         self.setStyleSheet("QCheckBox, QRadioButton{color:#e6e6e6}"
                            "QPushButton#fmt:checked{background:#0a84ff;border-color:#0a84ff;color:white}")
         self.selected = list(main.cfg.get("ball_formats", []))[:self.MAX]
         lay = self.content
-        self.chk = QCheckBox(tr("在屏幕边缘显示悬浮球"))
-        self.chk.setChecked(bool(main.cfg.get("ball_on")))
-        lay.addWidget(self.chk)
-        crow = QHBoxLayout()
-        crow.addWidget(QLabel(tr("关闭主窗口时：")))
-        self.rb_quit = QRadioButton(tr("完全退出"))
-        self.rb_hide = QRadioButton(tr("隐藏到系统托盘，保留悬浮球"))
-        (self.rb_hide if main.cfg.get("close_action") == "hide" else self.rb_quit).setChecked(True)
-        crow.addWidget(self.rb_quit)
-        crow.addWidget(self.rb_hide)
-        crow.addStretch()
-        lay.addLayout(crow)
-        self.chk.toggled.connect(self.rb_hide.setEnabled)
-        self.rb_hide.setEnabled(self.chk.isChecked())
         self.count = QLabel()
         self.count.setStyleSheet("color:#999")
         lay.addWidget(self.count)

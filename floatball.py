@@ -377,7 +377,7 @@ class FloatBall(QWidget):
         m.setStyleSheet("QMenu{background:#2b2b2b;color:#eee;border:1px solid #444}"
                         "QMenu::item{padding:6px 18px}QMenu::item:selected{background:#0a84ff}")
         m.addAction(self.tr("打开主窗口"), self.main.show_main)
-        m.addAction(self.tr("悬浮球设置…"), self.main.open_ball_settings)
+        m.addAction(self.tr("常用格式…"), self.main.open_ball_settings)
         m.addAction(self.tr("打开输出文件夹"), self.main.open_out)
         m.addSeparator()
         m.addAction(self.tr("退出"), self.main.quit_app)
