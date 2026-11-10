@@ -1,4 +1,4 @@
-﻿"""格式转换器 —— 拖入任意文件，点格式按钮即转换。输出到「输出根目录\\日期」文件夹。"""
+"""格式转换器 —— 拖入任意文件，点格式按钮即转换。输出到「输出根目录\\日期」文件夹。"""
 import ctypes
 import json
 import os
@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (QApplication, QFileDialog, QGridLayout, QHBoxLayout
 
 import converter
 
-VERSION = "1.4.1"
+VERSION = "1.4.2"
 HERE = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__))
 ASSETS = os.path.join(getattr(sys, "_MEIPASS", HERE), "assets")
 CONFIG = os.path.join(os.environ.get("APPDATA", HERE), "格式转换器", "config.json")
@@ -76,7 +76,7 @@ QTextBrowser { background:#1c1c1c; border:1px solid #333; border-radius:6px; }
 LANG = "zh"
 EN = {
     "格式转换器": "Format Converter",
-    "添加文件": "Add files", "添加文件夹": "Add folder", "清空": "Clear", "移除所选": "Remove selected",
+    "添加文件": "Add files", "添加文件夹": "Add folder", "清空": "Clear", "移除所选": "Remove",
     "更改输出目录…": "Change output…", "打开输出文件夹": "Open output folder",
     "图像": "Image", "文档": "Document", "表格": "Spreadsheet", "向量": "Vector",
     "就绪": "Ready", "输出到：": "Output: ",
@@ -103,7 +103,7 @@ EN = {
     "点击格式即开始批量转换列表中的全部文件": "Click a format to convert every file in the list",
     "双击文件直接打开；可多选后批量打开、定位或分享": "Double-click to open; multi-select to open, locate or share in bulk",
     "共 {n} 个文件": "{n} file(s)", "共 {n} 个结果": "{n} result(s)",
-    "打开": "Open", "定位": "Show in folder", "分享": "Share", "全选": "Select all", "清空记录": "Clear list",
+    "打开": "Open", "定位": "Locate", "分享": "Share", "全选": "All", "清空记录": "Clear",
     "请先选择结果文件": "Select result files first",
     "Windows 共享…": "Windows Share…", "复制文件（可粘贴到微信 / QQ / 邮件）": "Copy files (paste into chat / email)",
     "复制文件路径": "Copy file paths", "打包为 ZIP 并定位": "Pack into a ZIP and show it",
@@ -137,10 +137,10 @@ GUIDE = {
         ("Welcome to Format Converter", "Three steps: drop files → click a target format → open or share the results. "
                                         "Here is a quick look at each panel.", None),
         ("① Input files", "Drop files or folders anywhere in the window, or click “Add files”. Select several and press "
-                          "Delete or “Remove selected” to take them out.", "in"),
+                          "Delete or “Remove” to take them out.", "in"),
         ("② Target format", "Pick a category on the left (Image / Document / Spreadsheet / Vector), then click a format. "
                             "Every file in the list is converted.", "fmt"),
-        ("③ Results", "Converted files appear here. Double-click to open; multi-select to open, show in folder or share.", "out"),
+        ("③ Results", "Converted files appear here. Double-click to open; multi-select to open, locate or share.", "out"),
         ("Floating ball & tray", "Turn on the screen-edge floating ball in “Floating ball…” and drop files on it for quick "
                                  "conversions. When the window is closed the app can hide in the system tray — right-click "
                                  "its icon for quick actions. Click “?” in the title bar for help at any time.", None),
@@ -192,7 +192,7 @@ HELP_EN = """
 <li><b>See results</b>: they appear in “③ Results” and are saved in the output folder.</li></ol>
 <h3>2. Input files</h3>
 <ul><li>Any type can be dropped: images, PDF, Word/ODT, Excel/CSV, text, audio/video… Unknown files produce an info preview.</li>
-<li>Use Ctrl / Shift to multi-select, then <b>Delete</b> or “Remove selected”; “Clear” removes everything.</li></ul>
+<li>Use Ctrl / Shift to multi-select, then <b>Delete</b> or “Remove”; “Clear” removes everything.</li></ul>
 <h3>3. Target formats</h3>
 <ul><li><b>Image</b>: 30 formats incl. PNG, JPG, WEBP, TIFF, ICO, HEIC. Multi-page documents give one image per page.</li>
 <li><b>Document</b>: PDF, DOCX, DOC, RTF, ODT, TXT, HTML, XPS… Tables in PDFs are kept as tables where possible.</li>
@@ -201,7 +201,7 @@ HELP_EN = """
 <li>DJVU needs DjVuLibre; JBG needs pbmtojbg from JBIG-KIT.</li></ul>
 <h3>4. Results</h3>
 <ul><li><b>Double-click</b> a file to open it.</li>
-<li>Multi-select to <b>Open</b>, <b>Show in folder</b> or <b>Share</b> in bulk.</li>
+<li>Multi-select to <b>Open</b>, <b>Locate</b> or <b>Share</b> in bulk.</li>
 <li>Sharing: Windows Share panel; copy files and paste them into chat or email; copy paths; pack into a ZIP. Several files are packed into one ZIP for Windows Share.</li>
 <li>“Clear list” only clears the list — files are not deleted.</li></ul>
 <h3>5. Output location</h3>
@@ -370,7 +370,6 @@ class Main(QWidget):
         self.setMouseTracking(True)
         self.setAcceptDrops(True)
         self.resize(900, 700)
-        self.setMinimumSize(720, 600)
         self.cfg = load_cfg()
         global LANG
         LANG = self.cfg.get("lang", "zh")
@@ -419,10 +418,11 @@ class Main(QWidget):
 
         # ---- ③ 转换结果（输出）
         self.card_out, v = self.card("③ 转换结果", "双击文件直接打开；可多选后批量打开、定位或分享")
-        orow = QHBoxLayout()
         self.dir_label = QLabel(objectName="hint")
         self.dir_label.setWordWrap(True)
-        orow.addWidget(self.dir_label, 1)
+        v.addWidget(self.dir_label)
+        orow = QHBoxLayout()
+        orow.addStretch()
         for text, fn in (("更改输出目录…", self.pick_dir), ("打开输出文件夹", self.open_out)):
             b = self.L(QPushButton(), text)
             b.clicked.connect(fn)

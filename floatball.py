@@ -27,6 +27,9 @@ QPushButton#fmt {{ min-width:0; padding:0; background:#333; border:1px solid #47
                   font-size:12px; min-height:28px; }}
 QPushButton#fmt:hover {{ background:#0a84ff; border-color:#0a84ff; color:white; }}
 QPushButton#x {{ border:none; color:#aaa; font-size:14px; min-width:22px; max-width:22px; }}
+QPushButton#edit {{ font-family:"Segoe Fluent Icons","Segoe MDL2 Assets"; font-size:11px; color:#cfcfcf;
+                   border:1px solid #555; border-radius:5px; min-width:24px; max-width:24px; min-height:22px; max-height:22px; padding:0; }}
+QPushButton#edit:hover {{ border-color:#0a84ff; color:white; background:#0a3d75; }}
 QPushButton#x:hover {{ color:white; }}
 QPushButton#rm {{ border:none; color:#777; font-size:10px; min-width:18px; max-width:18px; min-height:18px; }}
 QPushButton#rm:hover {{ color:#ff7b72; }}
@@ -69,7 +72,7 @@ class FloatBall(QWidget):
         head = QHBoxLayout()
         self.count = QLabel(objectName="big")
         head.addWidget(self.count, 1)
-        self.btn_edit = QPushButton("✎", objectName="x")   # 快速编辑常用 6 种格式
+        self.btn_edit = QPushButton("", objectName="edit")   # 快速编辑常用 6 种格式
         self.btn_edit.clicked.connect(self.main.open_ball_settings)
         head.addWidget(self.btn_edit)
         self.btn_x = QPushButton("✕", objectName="x")
@@ -134,6 +137,8 @@ class FloatBall(QWidget):
         while self.names.count():
             w = self.names.takeAt(0).widget()
             if w:
+                w.hide()
+                w.setParent(None)   # 立即移出，避免旧行残留并让高度重新计算
                 w.deleteLater()
         for f in self.files[:4]:
             row = QWidget()
@@ -141,7 +146,7 @@ class FloatBall(QWidget):
             h.setContentsMargins(0, 0, 0, 0)
             lb = QLabel(objectName="sub")
             lb.setText(QFontMetrics(lb.font()).elidedText(os.path.basename(f), Qt.TextElideMode.ElideMiddle,
-                                                          CHOOSE_W - 52))
+                                                          self.choose_w() - 52))
             lb.setToolTip(f)
             h.addWidget(lb, 1)
             rm = QPushButton("✕", objectName="rm")
@@ -150,9 +155,11 @@ class FloatBall(QWidget):
             rm.clicked.connect(lambda _, f=f: self.remove_file(f))
             h.addWidget(rm)
             self.names.addWidget(row)
+            row.show()  # 新行需显式显示，否则计算高度时被忽略
         if n > 4:
             more = QLabel(self.tr("…等 {n} 个").format(n=n), objectName="sub")
             self.names.addWidget(more)
+            more.show()
         if not self.busy:
             self.status.setText(self.tr("选择要转换成的格式") if self.n_fmt else self.tr("右键设置常用格式"))
 
@@ -176,10 +183,20 @@ class FloatBall(QWidget):
     def panel_size(self, mode):
         if mode == "drop":
             return DROP_SIZE
-        self.page_choose.setFixedWidth(CHOOSE_W)
-        self.page_choose.adjustSize()
+        w = self.choose_w()
+        self.page_choose.setFixedWidth(w)
+        self.page_choose.layout().invalidate()
+        self.page_choose.layout().activate()
         h = self.page_choose.layout().sizeHint().height()
-        return QSize(CHOOSE_W, max(h, 120))
+        h = self.page_choose.layout().heightForWidth(w) if self.page_choose.layout().hasHeightForWidth() else h
+        return QSize(w, max(h, 120))
+
+    def choose_w(self):
+        """宽度随标题文字变化（英文更长），按钮与 ✎ ✕ 不会被挤压。"""
+        self.count.ensurePolished()
+        fm = QFontMetrics(self.count.font())
+        need = fm.horizontalAdvance(self.count.text()) + 12 + 8 + 24 + 22 + 20
+        return max(CHOOSE_W, min(need, 320))
 
     def rect_for(self, mode):
         r = self.screen_rect()
