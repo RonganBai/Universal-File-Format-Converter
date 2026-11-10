@@ -22,6 +22,166 @@ try:
 except Exception:  # pragma: no cover
     pillow_heif = None
 
+# 安全限制（由主程序按设置覆盖）
+SETTINGS = {"strip_meta": True, "max_mb": 500, "max_mpix": 200, "max_unzip_mb": 1024}
+_EXIF = {"data": None}
+PARAMS = {}   # 本次转换的参数：quality / max_side / pages / kind
+MAX_PAGES, MAX_FRAMES = 200, 100
+ANIM_FORMATS = ("GIF", "WEBP")   # 视频转这些格式时生成动图
+VIDEO_FPS = 10
+LEVELS = ("full", "partial", "preview")
+
+
+def parse_pages(spec, n):
+    """「1-3,5」→ 从 0 开始的页序号列表；空表示全部。"""
+    if not spec or not str(spec).strip():
+        return list(range(n))
+    out = []
+    for part in str(spec).replace("，", ",").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        a, _, b = part.partition("-")
+        lo = int(a) if a.strip() else 1
+        hi = int(b) if b.strip() else (lo if not _ else n)
+        for i in range(max(lo, 1), min(hi, n) + 1):
+            if i - 1 not in out:
+                out.append(i - 1)
+    return out
+
+
+class LazyPages(list):
+    """首次使用时才渲染整页图像：转成文档 / 表格时不渲染，省内存与 CPU。"""
+    def __init__(self, fn):
+        super().__init__()
+        self._fn, self._done = fn, False
+
+    def _load(self):
+        if not self._done:
+            self._done = True
+            super().extend(self._fn())
+
+    def __len__(self):
+        self._load()
+        return super().__len__()
+
+    def __iter__(self):
+        self._load()
+        return super().__iter__()
+
+    def __getitem__(self, i):
+        self._load()
+        return super().__getitem__(i)
+
+    def __bool__(self):
+        return len(self) > 0
+ZIP_EXTS = {"docx", "docm", "dotx", "dotm", "xlsx", "xlsm", "xltx", "xltm", "odt", "ods", "odp", "ott", "sxw",
+            "epub", "cbz", "kwd", "xps", "oxps", "zip", "pptx"}
+
+
+class LimitError(ValueError):
+    pass
+
+
+def check_limits(path):
+    """处理前检查：文件大小、压缩包解压后体积（防压缩炸弹）、图像像素上限。"""
+    mb = os.path.getsize(path) / 2 ** 20
+    if mb > SETTINGS["max_mb"]:
+        raise LimitError(f"文件 {mb:.0f} MB 超过上限 {SETTINGS['max_mb']} MB")
+    Image.MAX_IMAGE_PIXELS = int(SETTINGS["max_mpix"] * 1e6) // 2  # 超过 2 倍即报错，即超过上限
+    ext = os.path.splitext(path)[1].lower().lstrip(".")
+    if ext in ZIP_EXTS and zipfile.is_zipfile(path):
+        with zipfile.ZipFile(path) as z:
+            total = sum(i.file_size for i in z.infolist())
+        if total / 2 ** 20 > SETTINGS["max_unzip_mb"]:
+            raise LimitError(f"解压后 {total / 2 ** 20:.0f} MB 超过上限 {SETTINGS['max_unzip_mb']} MB")
+
+
+def strip_metadata(path):
+    """移除输出文件里的作者、修改者等元数据，返回 clean 已清理 / partial 部分清理 / unsupported 此格式不支持。"""
+    ext = os.path.splitext(path)[1].lower().lstrip(".")
+    if os.path.isdir(path):
+        return "unsupported"
+    if ext in _GENERATED_CLEAN:
+        return "clean"   # 由程序从像素 / 表格数据重新生成，不写入 EXIF、GPS、作者
+    if ext not in ("docx", "docm", "dotx", "dotm", "xlsx", "xlsm", "pdf", "odt", "sxw"):
+        return "unsupported"
+    try:
+        if ext in ("docx", "docm", "dotx", "dotm", "xlsx", "xlsm") and zipfile.is_zipfile(path):
+            buf = io.BytesIO()
+            with zipfile.ZipFile(path) as zi, zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zo:
+                for it in zi.infolist():
+                    b = zi.read(it)
+                    if it.filename == "docProps/core.xml":
+                        t = b.decode("utf-8")
+                        for tag in ("dc:creator", "cp:lastModifiedBy", "dc:description", "cp:keywords", "dc:subject"):
+                            t = re.sub(rf"<{tag}>.*?</{tag}>", f"<{tag}></{tag}>", t, flags=re.S)
+                        b = t.encode("utf-8")
+                    elif it.filename == "docProps/app.xml":
+                        t = b.decode("utf-8")
+                        for tag in ("Company", "Manager"):
+                            t = re.sub(rf"<{tag}>.*?</{tag}>", f"<{tag}></{tag}>", t, flags=re.S)
+                        b = t.encode("utf-8")
+                    zo.writestr(it, b)
+            with open(path, "wb") as f:
+                f.write(buf.getvalue())
+            return _verify_office(path)
+        elif ext in ("odt", "sxw") and zipfile.is_zipfile(path):
+            buf = io.BytesIO()
+            with zipfile.ZipFile(path) as zi, zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zo:
+                for it in zi.infolist():
+                    b = zi.read(it)
+                    if it.filename == "meta.xml":
+                        t = b.decode("utf-8")
+                        t = re.sub(r"<(meta:initial-creator|dc:creator|meta:generator)>.*?</\1>", "", t, flags=re.S)
+                        b = t.encode("utf-8")
+                    zo.writestr(it, b)
+            with open(path, "wb") as f:
+                f.write(buf.getvalue())
+            return "clean"
+        elif ext == "pdf":
+            import pymupdf
+            with open(path, "rb") as f:
+                doc = pymupdf.open(stream=f.read(), filetype="pdf")
+            doc.set_metadata({})
+            doc.del_xml_metadata()
+            data = doc.tobytes(garbage=1, deflate=True)
+            with open(path, "wb") as f:
+                f.write(data)
+            with open(path, "rb") as f:
+                left = {k: v for k, v in pymupdf.open(stream=f.read(), filetype="pdf").metadata.items()
+                        if k in ("author", "creator", "subject", "keywords", "title") and v}
+            return "partial" if left else "clean"
+        return "unsupported"
+    except Exception:
+        return "partial"
+
+
+_GENERATED_CLEAN = {"png", "jpg", "jpeg", "jfif", "jpe", "jif", "webp", "bmp", "gif", "dds", "ico", "cur", "tif", "tiff",
+                    "heic", "heif", "psd", "avif", "hdr", "tga", "rgb", "jp2", "wbmp", "jbg", "pcx", "exr", "ppm", "map",
+                    "pgm", "pdb", "ras", "csv"}
+
+
+def _verify_office(path):
+    with zipfile.ZipFile(path) as z:
+        if "docProps/core.xml" not in z.namelist():
+            return "clean"
+        t = z.read("docProps/core.xml").decode("utf-8", "ignore")
+    left = re.search(r"<(dc:creator|cp:lastModifiedBy)>[^<]+</", t)
+    return "partial" if left else "clean"
+
+
+def _excel_safe(val):
+    """防止公式注入：以 = + - @ 制表符/回车开头、且不是数字的文本，前面加 ' 作为纯文本。"""
+    if val and val[0] in "=+-@\t\r":
+        try:
+            float(val.replace(",", ""))
+            return val
+        except ValueError:
+            return "'" + val
+    return val
+
+
 IMAGE_FORMATS = ["PNG", "SVG", "ICO", "JPEG", "WEBP", "BMP", "GIF", "DDS", "CUR",
                  "TIFF", "HEIC", "PSD", "AVIF", "HDR", "TGA",
                  "RGB", "JFIF", "HEIF", "JP2", "WBMP", "JBG", "JPE", "PCX", "EXR",
@@ -42,6 +202,16 @@ class Content:
     text: list = field(default_factory=list)      # 段落文字
     pictures: list = field(default_factory=list)  # 嵌入文档的图片
     blocks: list = field(default_factory=list)    # 按顺序的 ("p", 文本) / ("table", 行列表)，保留表格结构
+    src_kind: str = "binary"                      # pdf / sheet / word / odt / image / video / audio / text / markup / binary
+    level: str = "full"                           # full 完整 / partial 部分输出 / preview 仅预览
+    notes: list = field(default_factory=list)     # 给用户看的说明
+    frame_ms: int = 500                           # 动图每帧时长（毫秒）
+
+    def note(self, msg, level=None):
+        if msg not in self.notes:
+            self.notes.append(msg)
+        if level and LEVELS.index(level) > LEVELS.index(self.level):
+            self.level = level
 
     def doc_blocks(self):
         return self.blocks or [("p", t) for t in self.text]
@@ -184,16 +354,32 @@ def load(path: str) -> Content:
     if ext in ("pdf", "xps", "oxps", "epub", "mobi", "fb2", "cbz", "svg") or (ext == "ai" and magic == b"%PDF-"):
         import pymupdf
         with open(path, "rb") as f:
-            doc = pymupdf.open(stream=f.read(), filetype="pdf" if ext == "ai" else ext)
-        for i, page in enumerate(doc):
-            if i >= 200:
-                break
-            pix = page.get_pixmap(dpi=150 if ext != "svg" else 96, alpha=(ext == "svg"))
-            mode = "RGBA" if pix.alpha else "RGB"
-            c.pages.append(Image.frombytes(mode, (pix.width, pix.height), pix.samples))
+            raw = f.read()
+        ftype = "pdf" if ext == "ai" else ext
+        doc = pymupdf.open(stream=raw, filetype=ftype)
+        c.src_kind = "image" if ext == "svg" else "pdf"
+        n = len(doc)
+        sel = parse_pages(PARAMS.get("pages"), n)
+        if PARAMS.get("pages"):
+            c.note(f"按预设只处理第 {PARAMS['pages']} 页（共 {n} 页）")
+        if len(sel) > MAX_PAGES:
+            c.note(f"共 {len(sel)} 页，只处理前 {MAX_PAGES} 页", "partial")
+            sel = sel[:MAX_PAGES]
+        tables = PARAMS.get("kind") in (None, "doc", "sheet") and ext != "svg"
+        for i in sel:
+            page = doc[i]
             c.text += [p for p in page.get_text().split("\n") if p.strip()]
-            if ext != "svg":
+            if tables:
                 c.blocks += _pdf_page_blocks(page)
+
+        def render(raw=raw, ftype=ftype, sel=sel, svg=(ext == "svg")):
+            d = pymupdf.open(stream=raw, filetype=ftype)
+            out = []
+            for i in sel:
+                pix = d[i].get_pixmap(dpi=150 if not svg else 96, alpha=svg)
+                out.append(Image.frombytes("RGBA" if pix.alpha else "RGB", (pix.width, pix.height), pix.samples))
+            return out
+        c.pages = LazyPages(render)
         if ext == "svg":
             c.pictures, c.text = c.pages, []
         return c
@@ -210,6 +396,8 @@ def load(path: str) -> Content:
                 c.blocks.append(("p", ws.title))
             c.blocks.append(("table", rows))
             c.text += ["\t".join(x or "" for x in r) for r in rows]
+        c.src_kind = "sheet"
+        c.note("公式按计算后的值导出，单元格样式与图表不保留", "partial")
         return c
     if ext in ("csv", "tsv"):
         import csv
@@ -218,6 +406,7 @@ def load(path: str) -> Content:
         rows = list(csv.reader(io.StringIO(txt), delimiter="\t" if ext == "tsv" else ","))
         c.blocks = [("table", rows)] if rows else []
         c.text = ["\t".join(r) for r in rows]
+        c.src_kind = "sheet"
         return c
 
     # 2b) Word 系列
@@ -251,6 +440,7 @@ def load(path: str) -> Content:
                     c.pictures.append(_rgb(Image.open(io.BytesIO(rel.target_part.blob))))
                 except Exception:
                     pass
+        c.src_kind = "word"
         return c
 
     if ext in ("odt", "ott", "odp", "ods"):
@@ -263,6 +453,7 @@ def load(path: str) -> Content:
                 c.pictures.append(_rgb(Image.open(io.BytesIO(data[1]))))
             except Exception:
                 pass
+        c.src_kind = "word"
         return c
 
     if ext == "kwd" and zipfile.is_zipfile(path):
@@ -270,6 +461,7 @@ def load(path: str) -> Content:
             xml = z.read("maindoc.xml").decode("utf-8", "ignore")
         import html
         c.text = [html.unescape(t) for t in re.findall(r"<TEXT[^>]*>(.*?)</TEXT>", xml, re.S)]
+        c.src_kind = "markup"
         return c
 
     # 3) 图像（含 HEIC/AVIF/PSD/DDS 等 Pillow 能读的）
@@ -280,29 +472,78 @@ def load(path: str) -> Content:
             img = Image.open(io.BytesIO(bytes(data)))
         else:
             img = Image.open(path)
-        frames = [_rgb(f) for i, f in zip(range(100), ImageSequence.Iterator(img))]
+        _EXIF["data"] = img.info.get("exif")
+        nf = getattr(img, "n_frames", 1)
+        sel = parse_pages(PARAMS.get("pages"), nf)
+        if len(sel) > MAX_FRAMES:
+            c.note(f"共 {len(sel)} 帧，只取前 {MAX_FRAMES} 帧", "partial")
+            sel = sel[:MAX_FRAMES]
+        frames = []
+        for i in sel:
+            img.seek(i)
+            frames.append(_rgb(img))
         c.pages = c.pictures = frames
+        c.frame_ms = int(img.info.get("duration") or 100) if len(frames) > 1 else 500  # 动图保留原帧时长
+        c.src_kind = "image"
         return c
     except Exception:
         pass
 
-    # 4) 音视频：取一帧
+    # 4) 音视频：取一帧（看起来是文本且不是常见音视频扩展名时跳过，避免把纯文本误当成视频流）
+    with open(path, "rb") as f:
+        head = f.read(65536)
+    media_ext = {"mp4", "mkv", "mov", "avi", "webm", "flv", "wmv", "m4v", "ts", "mpg", "mpeg", "3gp", "mp3", "wav",
+                 "flac", "aac", "m4a", "ogg", "opus", "wma", "aiff", "ape"}
     try:
+        if ext not in media_ext and _decode_text(head) is not None:
+            raise ValueError("text")
         import av
         with av.open(path) as cont:
             if cont.streams.video:
                 st = cont.streams.video[0]
+                c.src_kind = "video"
+                if PARAMS.get("kind") == "image" and PARAMS.get("fmt") in ANIM_FORMATS:
+                    # 动图：按每秒 VIDEO_FPS 帧均匀取帧，最多 MAX_FRAMES 帧；默认缩到最长边 480 控制体积
+                    side = PARAMS.get("max_side") or 480
+                    step, nxt, frames = 1 / VIDEO_FPS, 0.0, []
+                    for frame in cont.decode(st):
+                        t = frame.time or 0.0
+                        if t + 1e-6 < nxt:
+                            continue
+                        img = frame.to_image()
+                        if max(img.size) > side:
+                            img.thumbnail((side, side), Image.LANCZOS)
+                        frames.append(img)
+                        nxt += step
+                        if len(frames) >= MAX_FRAMES:
+                            break
+                    dur = (cont.duration or 0) / 1e6
+                    c.pages = c.pictures = frames
+                    c.frame_ms = int(1000 / VIDEO_FPS)
+                    shown = len(frames) / VIDEO_FPS
+                    if dur > shown + step:
+                        c.note(f"视频共 {dur:.1f} 秒，动图只取前 {shown:.0f} 秒（每秒 {VIDEO_FPS} 帧）", "partial")
+                    else:
+                        c.note(f"按每秒 {VIDEO_FPS} 帧生成动图，不含音频")
+                    return c
                 if st.duration and st.time_base:
                     cont.seek(int(st.duration * 0.1), stream=st)
                 for frame in cont.decode(st):
                     c.pages = c.pictures = [frame.to_image()]
                     break
+                c.src_kind = "video"
+                c.note("视频只提取一帧画面", "preview")
                 return c
             if cont.streams.audio:
                 dur = (cont.duration or 0) / 1e6
                 c.text = [f"音频文件：{os.path.basename(path)}", f"时长：{dur:.1f} 秒",
                           f"编码：{cont.streams.audio[0].codec_context.name}"]
-                c.text += [f"{k}: {v}" for k, v in cont.metadata.items()]
+                if SETTINGS["strip_meta"]:
+                    c.note("已按「移除敏感元数据」设置略去音频标签")
+                else:
+                    c.text += [f"{k}: {v}" for k, v in cont.metadata.items()]
+                c.src_kind = "audio"
+                c.note("音频只生成文件信息", "preview")
                 return c
     except Exception:
         pass
@@ -312,6 +553,11 @@ def load(path: str) -> Content:
         data = f.read(8 * 1024 * 1024)
     s = _decode_text(data)
     if s is not None:
+        c.src_kind = "text"
+        if os.path.getsize(path) > len(data):
+            c.note("文本超过 8 MB，只处理前 8 MB", "partial")
+        if ext in ("rtf", "html", "htm", "xml", "xhtml", "dbk", "abw", "aw", "fodt") or s.startswith("{\\rtf"):
+            c.src_kind = "markup"
         if ext == "rtf" or s.startswith("{\\rtf"):
             s = re.sub(r"\{\\fonttbl.*?\}\}", "", s, flags=re.S)
             s = re.sub(r"\{\\pict.*?\}", "", s, flags=re.S)
@@ -328,6 +574,8 @@ def load(path: str) -> Content:
         return c
 
     # 无法解析的二进制：生成文件信息 + 十六进制预览
+    c.src_kind = "binary"
+    c.note("无法识别文件内容，只生成文件信息与十六进制预览", "preview")
     size = os.path.getsize(path)
     c.text = [f"文件：{os.path.basename(path)}", f"大小：{size:,} 字节", "十六进制预览（前 2 KB）：", ""]
     for off in range(0, min(len(data), 2048), 16):
@@ -365,7 +613,7 @@ def render_text_pages(paras, size=28):
         for j, ln in enumerate(lines[i:i + per]):
             d.text((MARGIN, MARGIN + j * lh), ln, fill="black", font=font)
         pages.append(im)
-        if len(pages) >= 200:
+        if len(pages) >= MAX_PAGES:
             break
     return pages
 
@@ -553,25 +801,40 @@ def save_image(img, path, fmt):
         if fmt == "HEIC":
             if pillow_heif is None:
                 raise RuntimeError("HEIC 需要安装 pillow-heif")
-            img.save(path, "HEIF", quality=90)
+            img.save(path, "HEIF", quality=PARAMS.get("quality") or 90)
         elif fmt == "DDS":
             img.convert("RGBA").save(path, "DDS")
         else:
-            img.save(path, fmt, **({"quality": 92} if fmt in ("JPEG", "WEBP", "AVIF") else {}))
+            kw = {"quality": PARAMS.get("quality") or 92} if fmt in ("JPEG", "WEBP", "AVIF") else {}
+            if not SETTINGS["strip_meta"] and _EXIF["data"] and fmt in ("JPEG", "WEBP", "PNG", "TIFF"):
+                kw["exif"] = _EXIF["data"]
+            img.save(path, fmt, **kw)
         return
     with open(path, "wb") as f:
         f.write(data)
 
 
+def _fit(img, side):
+    if side and max(img.size) > side:
+        img = img.copy()
+        img.thumbnail((side, side), Image.LANCZOS)
+    return img
+
+
 def write_images(content, out_base, fmt):
     pages = content.page_images()
+    if PARAMS.get("max_side"):
+        pages = [_fit(p, PARAMS["max_side"]) for p in pages]
     ext = ext_of(fmt)
-    if fmt in ("GIF", "TIFF") and len(pages) > 1:  # 多帧/多页格式
+    if fmt in ("GIF", "TIFF", "WEBP") and len(pages) > 1:  # 多帧/多页格式
         path = out_base + ext
         first, rest = pages[0], pages[1:]
         if fmt == "GIF":
             first.convert("RGB").save(path, save_all=True, append_images=[p.convert("RGB") for p in rest],
-                                      duration=500, loop=0)
+                                      duration=content.frame_ms, loop=0, optimize=True)
+        elif fmt == "WEBP":
+            first.save(path, "WEBP", save_all=True, append_images=rest, duration=content.frame_ms, loop=0,
+                       quality=PARAMS.get("quality") or 80)
         else:
             first.save(path, save_all=True, append_images=rest, compression="tiff_deflate")
         return [path]
@@ -993,7 +1256,7 @@ def write_sheet(c, path, fmt):
         for i, (name, v) in enumerate(sheets):
             if i:
                 rows.append([])
-            rows += [[x or "" for x in r] for r in v]
+            rows += [[_excel_safe(x or "") for x in r] for r in v]
         with open(path, "w", encoding="utf-8-sig", newline="") as f:
             csv.writer(f).writerows(rows)
         return
@@ -1015,6 +1278,8 @@ def write_sheet(c, path, fmt):
                     cell.value = int(num) if num.isdigit() else float(num) if num.replace(".", "", 1).lstrip("-").isdigit() else val
                 except ValueError:
                     cell.value = val
+                if isinstance(cell.value, str):
+                    cell.data_type = "s"  # 显式写成文本单元格，以 = 开头的内容不会变成公式
                 cell.alignment = Alignment(wrap_text=True, vertical="center")
                 cell.font = Font(name="微软雅黑", size=10)
                 if name != "文本":
@@ -1083,8 +1348,58 @@ def _unique_base(out_dir, title, ext):
     return base
 
 
+def assess(c, kind, fmt):
+    """按来源与目标判断能保留多少内容。"""
+    sk = c.src_kind
+    if c.level == "preview":
+        return
+    if kind == "image":
+        if sk in ("word", "markup", "sheet"):
+            c.note("文字重新排版后渲染为图片，原排版样式不保留", "partial")
+        elif sk == "text":
+            c.note("文字渲染为图片，不再是可编辑文字")
+    elif kind in ("doc", "sheet") and sk == "pdf":
+        c.note("提取文字与表格重新排版，原字体、版式与页面图片不保留", "partial")
+    elif kind == "doc" and sk in ("word", "markup"):
+        c.note("保留文字、表格与图片，原排版样式不保留", "partial")
+    elif kind == "sheet" and sk not in ("sheet", "pdf", "word"):
+        c.note("没有识别到表格，文字放在「文本」工作表中", "partial")
+    elif kind == "vector":
+        if not (sk == "pdf" and fmt in ("SVG", "AI")):
+            c.note("以图像嵌入或像素描摹生成，不是真矢量", "partial")
+    if kind == "doc" and sk == "image":
+        c.note("图片嵌入文档，不做文字识别")
+
+
+def convert_into(src, base, fmt, kind=None, params=None):
+    """读取 src 并写出到 base（不含扩展名）；返回 {files, meta, level, notes}。"""
+    check_limits(src)
+    _EXIF["data"] = None
+    kind = kind or ("image" if fmt in IMAGE_FORMATS else "doc" if fmt in DOC_FORMATS
+                    else "sheet" if fmt in SHEET_FORMATS else "vector")
+    PARAMS.clear()
+    PARAMS.update({k: v for k, v in (params or {}).items() if v})
+    PARAMS["kind"] = kind
+    PARAMS["fmt"] = fmt
+    c = load(src)
+    assess(c, kind, fmt)
+    if kind == "image":
+        out = write_images(c, base, fmt)
+    elif kind == "sheet":
+        write_sheet(c, base + ext_of(fmt), fmt)
+        out = [base + ext_of(fmt)]
+    elif kind == "vector":
+        import vector
+        out = vector.write_vector(c, base, fmt, src)
+    else:
+        out = write_document(c, base, fmt)
+    meta = {pth: (strip_metadata(pth) if SETTINGS["strip_meta"] else "kept") for pth in out}
+    return {"files": out, "meta": meta, "level": c.level, "notes": c.notes}
+
+
 def convert(src, out_dir, fmt, kind=None):
     """kind 为 "image" / "doc" / "vector"；SVG 同时出现在图像与向量两类里，用 kind 区分。"""
+    check_limits(src)
     c = load(src)
     kind = kind or ("image" if fmt in IMAGE_FORMATS else "doc" if fmt in DOC_FORMATS
                     else "sheet" if fmt in SHEET_FORMATS else "vector")

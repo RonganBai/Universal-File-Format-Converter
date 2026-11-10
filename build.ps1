@@ -9,7 +9,7 @@ python -m pip install -r requirements.txt
 
 pyinstaller --noconfirm --windowed --name "FormatConverter" `
     --icon "$root\assets\icon.ico" --add-data "$root\assets;assets" `
-    --hidden-import vector --hidden-import floatball --collect-all pillow_heif --collect-data docx --collect-all av `
+    --hidden-import vector --hidden-import floatball --hidden-import safejob --collect-all pillow_heif --collect-data docx --collect-all av `
     --exclude-module PyQt6.QtWebEngineCore --exclude-module PyQt6.QtWebEngineWidgets `
     --exclude-module PyQt6.QtPdf --exclude-module PyQt6.Qt3DCore --exclude-module tkinter `
     --workpath "$out\work" --specpath "$out\work" --distpath "$out\dist" app.py
