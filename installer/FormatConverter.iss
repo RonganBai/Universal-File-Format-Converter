@@ -1,6 +1,6 @@
-; 格式转换器 安装包脚本（Inno Setup 6）——由 build.ps1 调用
+﻿; 格式转换器 安装包脚本（Inno Setup 6）——由 build.ps1 调用
 #define AppName "格式转换器"
-#define AppVersion "1.13.3"
+#define AppVersion "1.13.4"
 #define AppPublisher "RonganBai"
 #define AppExe "FormatConverter.exe"
 #ifndef DistDir
@@ -47,9 +47,11 @@ Name: "desktopicon"; Description: "{cm:TaskDesktop}"; GroupDescription: "{cm:Gro
 Source: "{#DistDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"
+Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\_internal\assets\icon.ico"
 Name: "{group}\卸载 {#AppName}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\_internal\assets\icon.ico"; Tasks: desktopicon
 
 [Run]
+; 刷新 Windows 图标缓存，覆盖安装后桌面 / 开始菜单立即显示新图标
+Filename: "{sys}\ie4uinit.exe"; Parameters: "-show"; Flags: runhidden nowait
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent

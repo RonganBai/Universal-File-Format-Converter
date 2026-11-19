@@ -42,7 +42,7 @@ CAPS = {
 CAPS_COMMON = "无法识别的文件只生成信息预览；视频转 GIF / WEBP 为动图，转视频类格式为完整转码，转其他格式只取一帧，音频只生成文件信息；结果会标注「完整转换」「部分输出」「仅生成预览」或「失败」。"
 SYNC_ENV = ("OneDrive", "OneDriveCommercial", "OneDriveConsumer")
 
-VERSION = "1.13.3"
+VERSION = "1.13.4"
 HERE = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__))
 ASSETS = os.path.join(getattr(sys, "_MEIPASS", HERE), "assets")
 CONFIG = os.path.join(os.environ.get("APPDATA", HERE), "格式转换器", "config.json")
