@@ -1,68 +1,61 @@
 # 格式转换器
 
-一个面向 Windows 的桌面文件格式转换工具。拖入文件或文件夹，选择目标格式，即可批量完成图像、文档和矢量文件的转换。
+**简体中文** · [English](README.en.md)
 
-## 功能特色
+适用于 Windows 的桌面批量转换工具，支持图像、文档、电子表格、矢量图和视频。
 
-- 支持拖拽添加多个文件或整个文件夹
-- 图像、文档、矢量图三大转换类别
-- 支持 PNG、JPEG、WEBP、GIF、ICO、TIFF、HEIC、AVIF、PDF、DOCX、ODT、RTF、SVG、AI、EPS、WMF 等多种目标格式
-- 可自定义输出目录；结果会自动按日期归档
-- 显示转换进度、成功数量和失败文件信息
-- 内置中文 / English 界面切换
-- 支持悬浮球快速转换：拖入文件后从常用格式中一键选择
-- 悬浮球可贴靠屏幕左侧、右侧或顶部，并可设置关闭主窗口后继续常驻
+## 下载安装
+
+[查看最新发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/latest) · [浏览所有版本](https://github.com/RonganBai/Universal-File-Format-Converter/releases)
+
+| 版本 | Windows x64 安装包 | 更新说明 |
+| --- | --- | --- |
+| v1.13.3 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.3/FormatConverter-Setup-1.13.3.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.3) |
+| v1.13.2 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.2/FormatConverter-Setup-1.13.2.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.2) |
+| v1.13.1 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.1/FormatConverter-Setup-1.13.1.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.1) |
+| v1.13.0 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.0/FormatConverter-Setup-1.13.0.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.0) |
+| v1.12.1 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.12.1/FormatConverter-Setup-1.12.1.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.12.1) |
+| v1.12.0 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.12.0/FormatConverter-Setup-1.12.0.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.12.0) |
+| v1.11.1 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.11.1/FormatConverter-Setup-1.11.1.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.11.1) |
+| v1.11.0 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.11.0/FormatConverter-Setup-1.11.0.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.11.0) |
+| v1.10.1 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.10.1/FormatConverter-Setup-1.10.1.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.10.1) |
+| v1.10.0 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.10.0/FormatConverter-Setup-1.10.0.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.10.0) |
+| v1.9.0 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.9.0/FormatConverter-Setup-1.9.0.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.9.0) |
 
 ## 快速开始
 
-1. 运行 `FormatConverter.exe`，或执行源码入口 `app.py`。
-2. 将文件或文件夹拖入窗口，也可以点击“添加文件”。
-3. 在图像、文档或矢量分类中选择目标格式，转换会立即开始。
-4. 转换结果默认保存至“格式转换输出\\日期”文件夹；可在界面中修改输出目录。
+1. 运行安装包，安装后打开「格式转换器」。
+2. 拖入文件或文件夹，也可以点「添加文件」。
+3. 选择目标格式开始转换。结果默认保存到用户目录下的 `格式转换输出\日期`，可在「设置 → 常规」修改。
+4. 首次启动时可选择简体中文或 English。之后可点击窗口标题栏的「EN / 中文」切换语言，选择会自动保存。
 
-## 悬浮球快速转换
+## 功能
 
-在主窗口点击“悬浮球设置…”，开启悬浮球并选择最多 6 种常用格式。
-
-- 将悬浮球拖到屏幕边缘，即可自动吸附。
-- 直接将文件或文件夹拖到悬浮球，选择目标格式开始转换。
-- 右键悬浮球可进入设置、打开主窗口、打开输出文件夹或退出程序。
-- 可选择关闭主窗口时仅隐藏窗口，使悬浮球继续在后台待命。
+- 批量转换 PNG、JPEG、WEBP、GIF、ICO、TIFF、HEIC、AVIF、PDF、DOCX、ODT、RTF、SVG、AI、EPS、WMF 等格式。
+- 视频支持 MP4、MOV、MKV、WEBM、AVI、WMV、FLV、TS、MTS、M2TS、MPG、MPEG、3GP 和 VOB。可选 H.264、H.265/HEVC、AV1、VP9、VP8、ProRes 422 HQ、DNxHR HQ、MPEG-2、MJPEG，或保留原编码只换封装。编码与容器不兼容时，程序会采用推荐编码并在结果中说明。
+- 预设可保存常用转换配置，包括视频编码和最长边。任务和历史页面可查看转换进度与结果。
+- 悬浮球支持拖入文件或文件夹、最多六种快捷格式、屏幕边缘吸附和后台常驻。右键可打开主窗口、设置或输出目录，也可退出程序。
+- 可切换浅色和深色模式，并自定义背景色与强调色。
 
 ## 从源码运行
 
-### 环境要求
-
-- Windows 10/11
-- Python 3.10 或更高版本
-
-### 安装依赖并运行
+需要 Windows 10/11 和 Python 3.10 或更高版本。
 
 ```powershell
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 python app.py
 ```
 
 ## 构建安装包
 
-在 PowerShell 中运行：
+安装 Inno Setup 6 后，在 PowerShell 中运行：
 
 ```powershell
-.\\build.ps1
+.\build.ps1
 ```
 
-构建脚本会使用 PyInstaller 生成应用程序，并通过 Inno Setup 创建 Windows 安装包。生成的安装包位于 `installer/Output/`，该目录不纳入 Git 版本管理。
-
-## 已知说明
-
-部分格式依赖系统或第三方工具支持。例如 DJVU 需要安装 DjVuLibre，JBG 需要将 JBIG-KIT 的 `pbmtojbg.exe` 加入系统 PATH。
+PyInstaller 打包应用，Inno Setup 生成 `installer/Output/` 下的安装包。DJVU 需要 DjVuLibre，JBG 需要将 JBIG-KIT 的 `pbmtojbg.exe` 加入 PATH。
 
 ## 许可证
 
 暂未声明许可证。
-## 视频转换
-
-「视频」类别支持把视频转为 MP4 / MOV / MKV / WEBM / AVI / WMV / FLV / TS / MTS / M2TS / MPG / MPEG / 3GP / VOB，
-并可单独选择视频编码：H.264、H.265/HEVC、AV1、VP9、VP8、ProRes 422 HQ、DNxHR HQ、MPEG-2、MJPEG，
-或「保持原编码」只换封装（无损、最快）。所选编码与格式不兼容时自动改用推荐编码并在结果中说明。
-预设中也可保存视频编码与最长边。视频转码的超时为常规超时的 12 倍，文件大小上限至少 4 GB。
