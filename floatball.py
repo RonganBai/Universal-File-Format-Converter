@@ -16,39 +16,55 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QPu
 
 BUBBLE_T = 22      # 气泡厚度（贴边方向的尺寸）
 ORB = 46           # 拖动时的球状悬浮球直径
-PANEL_BG = QColor(31, 31, 31, 240)
 DROP_SIZE = QSize(150, 128)
 CHOOSE_W = 220
-ROW_H = 20
+ROW_H = 28
 FONT = "Microsoft YaHei UI"
-BLUE, GREEN, AMBER = QColor(10, 110, 230, 191), QColor(30, 150, 90, 210), QColor(205, 130, 20, 215)
+GREEN, AMBER = QColor("#22a06b"), QColor("#d9822b")
 
-QSS = f"""
-QWidget {{ background:transparent; color:#e8e8e8; font-family:"{FONT}"; }}
-QLabel#big {{ font-size:13px; font-weight:bold; }}
-QLabel#sub {{ font-size:11px; color:#a8a8a8; }}
-QLabel#ok {{ font-size:11px; color:#7ee2a8; }} QLabel#bad {{ font-size:11px; color:#ffb070; }}
-QPushButton#fmt {{ min-width:0; padding:0; background:#333; border:1px solid #474747; border-radius:6px; font-weight:bold;
-                  font-size:12px; min-height:28px; }}
-QPushButton#fmt:hover {{ background:#0a84ff; border-color:#0a84ff; color:white; }}
-QPushButton#act {{ background:#2f2f2f; border:1px solid #474747; border-radius:5px; font-size:11px; padding:3px 8px; min-height:22px; }}
-QPushButton#act:hover {{ border-color:#0a84ff; background:#0a3d75; }}
-QPushButton#cancel {{ background:#3a2323; border:1px solid #7a3a3a; border-radius:5px; font-size:11px; padding:2px 8px; color:#ffb3ad; }}
-QPushButton#cancel:hover {{ background:#5a2a2a; }}
-QPushButton#x {{ border:none; color:#aaa; font-size:14px; min-width:22px; max-width:22px; }}
-QPushButton#x:hover {{ color:white; }}
-QPushButton#edit {{ font-family:"Segoe Fluent Icons","Segoe MDL2 Assets"; font-size:11px; color:#cfcfcf;
-                   border:1px solid #555; border-radius:5px; min-width:24px; max-width:24px; min-height:22px; max-height:22px; padding:0; }}
-QPushButton#edit:hover {{ border-color:#0a84ff; color:white; background:#0a3d75; }}
-QPushButton#rm {{ border:none; color:#777; font-size:10px; min-width:18px; max-width:18px; min-height:18px; }}
-QPushButton#rm:hover {{ color:#ff7b72; }}
-QPushButton#more {{ border:none; color:#4ea1ff; font-size:11px; text-align:left; padding:0; }}
-QPushButton#more:hover {{ color:#8cc4ff; }}
-QProgressBar {{ border:none; background:#333; max-height:5px; min-height:5px; border-radius:2px; }}
-QProgressBar::chunk {{ background:#0a84ff; border-radius:2px; }}
-QScrollArea {{ border:none; }}
-QScrollBar:vertical {{ background:transparent; width:6px; }} QScrollBar::handle:vertical {{ background:#555; border-radius:3px; }}
+
+def build_qss(t):
+    """与主窗口共用配色（深色 / 浅色）。"""
+    return f"""
+QWidget {{ background:transparent; color:{t['text']}; font-family:"{FONT}"; }}
+QLabel#big {{ font-size:13px; font-weight:bold; color:{t['text']}; }}
+QLabel#sub {{ font-size:11px; color:{t['muted']}; }}
+QLabel#ok {{ font-size:11px; color:#22a06b; }} QLabel#bad {{ font-size:11px; color:#d9822b; }}
+QPushButton {{ font-family:"{FONT}"; }}
+QPushButton#fmt {{ min-width:0; padding:0 4px; background:{t['soft']}; border:1px solid {t['accent']}; border-radius:8px;
+                  font-weight:bold; font-size:12px; min-height:30px; color:{t['softt']}; }}
+QPushButton#fmt:hover {{ background:{t['accent']}; border-color:{t['accent']}; color:white; }}
+QPushButton#act {{ background:{t['soft']}; border:1px solid {t['accent']}; border-radius:8px; font-size:11px;
+                  padding:3px 10px; min-height:24px; color:{t['softt']}; }}
+QPushButton#act:hover {{ background:{t['accent']}; border-color:{t['accent']}; color:white; }}
+QPushButton#cancel {{ background:rgba(229,72,77,0.14); border:1px solid #e5484d; border-radius:8px; font-size:11px;
+                     padding:2px 10px; min-height:22px; color:#e5484d; }}
+QPushButton#cancel:hover {{ background:#e5484d; color:white; }}
+QPushButton#x {{ background:rgba(229,72,77,0.14); border:1px solid rgba(229,72,77,0.55); border-radius:6px; padding:0; color:#e5484d; font-size:12px; min-width:24px; max-width:24px;
+                min-height:24px; max-height:24px; }}
+QPushButton#x:hover {{ background:#e5484d; color:white; border-color:#e5484d; }}
+QPushButton#edit {{ font-family:"Segoe Fluent Icons","Segoe MDL2 Assets"; font-size:11px; color:{t['softt']};
+                   background:{t['soft']}; border:1px solid {t['accent']}; border-radius:6px; min-width:24px; max-width:24px;
+                   min-height:24px; max-height:24px; padding:0; }}
+QPushButton#edit:hover {{ background:{t['accent']}; color:white; border-color:{t['accent']}; }}
+QWidget#frow {{ border-bottom:1px solid {t['sep']}; border-radius:0; }}
+QWidget#frow:hover {{ background:{t['btnh']}; border-radius:6px; border-bottom-color:transparent; }}
+QPushButton#rm {{ border:1px solid {t['btnb']}; border-radius:5px; padding:0; color:{t['faint']}; font-size:9px;
+                 min-width:20px; max-width:20px; max-height:20px;
+                 min-height:18px; }}
+QPushButton#rm:hover {{ color:#e5484d; background:{t['btnh']}; border-color:#e5484d; }}
+QPushButton#more {{ border:1px solid {t['btnb']}; border-radius:6px; color:{t['accent']}; font-size:11px;
+                   padding:2px 8px; background:{t['btn']}; }}
+QPushButton#more:hover {{ color:{t['accenth']}; border-color:{t['accent']}; background:{t['btnh']}; }}
+QPushButton#fmt:pressed, QPushButton#act:pressed {{ background:{t['accent']}; color:white; }}
+QProgressBar {{ border:none; background:{t['btnb']}; max-height:5px; min-height:5px; border-radius:2px; }}
+QProgressBar::chunk {{ background:{t['accent']}; border-radius:2px; }}
+QScrollArea {{ border:none; background:transparent; }}
+QAbstractScrollArea > QWidget#qt_scrollarea_viewport, QScrollArea > QWidget > QWidget {{ background:transparent; }}
+QScrollBar:vertical {{ background:transparent; width:6px; }}
+QScrollBar::handle:vertical {{ background:{t['btnb']}; border-radius:3px; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ height:0; }}
+QScrollBar::add-page, QScrollBar::sub-page {{ background:transparent; }}
 """
 
 
@@ -80,7 +96,7 @@ class FloatBall(QWidget):
         self.main = main
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAcceptDrops(True)
-        self.setStyleSheet(QSS)
+        self.apply_theme(repaint=False)
         self.mode = "bubble"
         self.files = []          # 待转换（或「下一批」）文件
         self.job = None          # 正在运行的 Worker
@@ -235,10 +251,16 @@ class FloatBall(QWidget):
             return self.tr("完成 {n} 个").format(n=self.last["ok"])
         return self.tr("文件转换")
 
+    def apply_theme(self, repaint=True):
+        self.t = self.main.theme_colors()
+        self.setStyleSheet(build_qss(self.t))
+        if repaint:
+            self.update()
+
     def bubble_color(self):
         if self.last and not self.job:
             return AMBER if self.last["failed"] else GREEN
-        return BLUE
+        return QColor(self.t["accent"])
 
     def rebuild(self):
         while self.grid.count():
@@ -322,18 +344,22 @@ class FloatBall(QWidget):
         shown = files if self.show_all else files[:4]
         width = self.choose_w()
         for f in shown:
-            row = QWidget()
+            row = QWidget(objectName="frow")   # 每个文件一行，底部分隔线，悬停整行高亮，删除键与文件名对应
+            row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
             row.setFixedHeight(ROW_H)
             h = QHBoxLayout(row)
-            h.setContentsMargins(0, 0, 4, 0)
+            h.setContentsMargins(6, 0, 4, 0)
+            h.setSpacing(6)
             lb = QLabel(objectName="sub")
             lb.setText(QFontMetrics(lb.font()).elidedText(os.path.basename(f), Qt.TextElideMode.ElideMiddle, width - 60))
             lb.setToolTip(f)
             h.addWidget(lb, 1)
             rm = QPushButton("✕", objectName="rm")
+            rm.setFixedSize(20, 20)
+            rm.setCursor(Qt.CursorShape.PointingHandCursor)
             rm.setToolTip(self.tr("移除"))
             rm.clicked.connect(lambda _, f=f: self.remove_file(f))
-            h.addWidget(rm)
+            h.addWidget(rm, 0, Qt.AlignmentFlag.AlignVCenter)
             self.names.addWidget(row)
             row.show()  # 新行需显式显示，否则计算高度时被忽略
         self.names_area.setVisible(bool(shown))
@@ -425,6 +451,8 @@ class FloatBall(QWidget):
     def apply_mode(self, mode, animate=True):
         old = self.mode
         self.mode = mode
+        if mode == "drop" and not self.drag_hot:
+            self.set_hot(False)   # 填好提示文字，避免展开后一片空白
         self.page_drop.setVisible(mode == "drop")
         self.page_choose.setVisible(mode == "panel")
         target = self.rect_for(mode)
@@ -524,12 +552,22 @@ class FloatBall(QWidget):
         else:
             rr.adjust(0, -ext, 0, 0)
         hot = self.drag_hot and self.mode in ("drop", "panel")
-        bg = QColor(10, 60, 117, 235) if hot else PANEL_BG
-        p.setBrush(self._mix(self.bubble_color(), bg, t))
-        if t > 0.5:
-            p.setPen(QPen(QColor(10, 132, 255), 2, Qt.PenStyle.DashLine) if hot else QColor(70, 70, 70))
+        bg = QColor(self.t["soft"] if hot else self.t["card"])
+        bg.setAlpha(250)
+        top = self.bubble_color()
+        if t < 0.5:   # 气泡 / 球：上亮下暗的渐变，更有质感
+            from PyQt6.QtGui import QLinearGradient
+            g = QLinearGradient(rr.topLeft(), rr.bottomLeft())
+            g.setColorAt(0, top.lighter(118))
+            g.setColorAt(1, top)
+            p.setBrush(g)
         else:
-            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(self._mix(top, bg, t))
+        if t > 0.5:
+            p.setPen(QPen(QColor(self.t["accent"]), 1.5, Qt.PenStyle.DashLine) if hot else QPen(QColor(self.t["cardb"]), 1))
+        else:
+            p.setPen(QPen(QColor(255, 255, 255, 60), 1))
+        rad = rad if t < 0.5 else 14 * t + rad * (1 - t)
         p.drawRoundedRect(rr.adjusted(1, 1, -1, -1), rad, rad)
         if t >= 0.35:
             return
@@ -696,11 +734,14 @@ class FloatBall(QWidget):
 
     def contextMenuEvent(self, e):
         m = QMenu(self)
-        m.setStyleSheet("QMenu{background:#2b2b2b;color:#eee;border:1px solid #444}"
-                        "QMenu::item{padding:6px 18px}QMenu::item:selected{background:#0a84ff}")
+        t = self.t
+        m.setStyleSheet(f"QMenu{{background:{t['card']};color:{t['text']};border:1px solid {t['cardb']};border-radius:8px;"
+                        f"padding:4px}}QMenu::item{{padding:6px 20px;border-radius:6px}}"
+                        f"QMenu::item:selected{{background:{t['accent']};color:white}}"
+                        f"QMenu::separator{{height:1px;background:{t['sep']};margin:4px 8px}}")
         m.addAction(self.tr("打开主窗口"), self.main.show_main)
         m.addAction(self.tr("查看任务"), self.main.open_tasks)
-        m.addAction(self.tr("常用格式…"), self.main.open_ball_settings)
+        m.addAction(self.tr("常用格式"), self.main.open_ball_settings)
         m.addAction(self.tr("打开输出文件夹"), self.main.open_out)
         m.addSeparator()
         a = m.addAction(self.tr("锁定位置"))

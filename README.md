@@ -60,3 +60,9 @@ python app.py
 ## 许可证
 
 暂未声明许可证。
+## 视频转换
+
+「视频」类别支持把视频转为 MP4 / MOV / MKV / WEBM / AVI / WMV / FLV / TS / MTS / M2TS / MPG / MPEG / 3GP / VOB，
+并可单独选择视频编码：H.264、H.265/HEVC、AV1、VP9、VP8、ProRes 422 HQ、DNxHR HQ、MPEG-2、MJPEG，
+或「保持原编码」只换封装（无损、最快）。所选编码与格式不兼容时自动改用推荐编码并在结果中说明。
+预设中也可保存视频编码与最长边。视频转码的超时为常规超时的 12 倍，文件大小上限至少 4 GB。

@@ -83,11 +83,12 @@ class LimitError(ValueError):
     pass
 
 
-def check_limits(path):
-    """处理前检查：文件大小、压缩包解压后体积（防压缩炸弹）、图像像素上限。"""
+def check_limits(path, kind=None):
+    """处理前检查：文件大小、压缩包解压后体积（防压缩炸弹）、图像像素上限。视频转换上限至少 4 GB。"""
     mb = os.path.getsize(path) / 2 ** 20
-    if mb > SETTINGS["max_mb"]:
-        raise LimitError(f"文件 {mb:.0f} MB 超过上限 {SETTINGS['max_mb']} MB")
+    cap = max(SETTINGS["max_mb"], 4096) if kind == "video" else SETTINGS["max_mb"]
+    if mb > cap:
+        raise LimitError(f"文件 {mb:.0f} MB 超过上限 {cap} MB")
     Image.MAX_IMAGE_PIXELS = int(SETTINGS["max_mpix"] * 1e6) // 2  # 超过 2 倍即报错，即超过上限
     ext = os.path.splitext(path)[1].lower().lstrip(".")
     if ext in ZIP_EXTS and zipfile.is_zipfile(path):
@@ -190,6 +191,7 @@ DOC_FORMATS = ["PDF", "DOC", "DOCX", "DOCM", "ODT", "XPS", "RTF", "DOT", "DOTX",
                "DJVU", "DOTM", "ABW", "KWD", "AW", "DBK", "OXPS", "SXW"]
 SHEET_FORMATS = ["XLSX", "XLSM", "CSV"]
 VECTOR_FORMATS = ["SVG", "AI", "PLT", "EPS", "WMF", "SK", "EMF", "FIG", "CGM", "SK1", "PS"]
+from videoconv import VIDEO_FORMATS  # noqa: E402  视频容器：MP4 / MOV / MKV / WEBM …
 
 FONT_PATH = r"C:\Windows\Fonts\msyh.ttc"
 PAGE_W, PAGE_H, MARGIN = 1240, 1754, 100  # A4 @150dpi
@@ -492,7 +494,8 @@ def load(path: str) -> Content:
     # 4) 音视频：取一帧（看起来是文本且不是常见音视频扩展名时跳过，避免把纯文本误当成视频流）
     with open(path, "rb") as f:
         head = f.read(65536)
-    media_ext = {"mp4", "mkv", "mov", "avi", "webm", "flv", "wmv", "m4v", "ts", "mpg", "mpeg", "3gp", "mp3", "wav",
+    media_ext = {"mp4", "mkv", "mov", "avi", "webm", "flv", "wmv", "m4v", "ts", "mts", "m2ts", "mpg", "mpeg", "3gp",
+                 "vob", "mp3", "wav",
                  "flac", "aac", "m4a", "ogg", "opus", "wma", "aiff", "ape"}
     try:
         if ext not in media_ext and _decode_text(head) is not None:
@@ -1373,14 +1376,20 @@ def assess(c, kind, fmt):
 
 def convert_into(src, base, fmt, kind=None, params=None):
     """读取 src 并写出到 base（不含扩展名）；返回 {files, meta, level, notes}。"""
-    check_limits(src)
     _EXIF["data"] = None
     kind = kind or ("image" if fmt in IMAGE_FORMATS else "doc" if fmt in DOC_FORMATS
-                    else "sheet" if fmt in SHEET_FORMATS else "vector")
+                    else "sheet" if fmt in SHEET_FORMATS else "video" if fmt in VIDEO_FORMATS else "vector")
+    check_limits(src, kind)
     PARAMS.clear()
     PARAMS.update({k: v for k, v in (params or {}).items() if v})
     PARAMS["kind"] = kind
     PARAMS["fmt"] = fmt
+    if kind == "video":
+        import videoconv
+        path, notes, level = videoconv.transcode(src, base, fmt, PARAMS.get("vcodec") or "auto", PARAMS,
+                                                 SETTINGS["strip_meta"])
+        return {"files": [path], "meta": {path: "clean" if SETTINGS["strip_meta"] else "kept"},
+                "level": level, "notes": notes}
     c = load(src)
     assess(c, kind, fmt)
     if kind == "image":

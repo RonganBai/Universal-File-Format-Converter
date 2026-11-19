@@ -159,7 +159,8 @@ class Runner:
         if not self.p or not self.p.is_alive():
             self._start()
         self.req.put(task)
-        deadline = time.time() + self.cfg["timeout_s"]
+        start = time.time()
+        deadline = start + self.cfg["timeout_s"] * (12 if task[3] == "video" else 1)   # 视频转码耗时长
         while True:
             try:
                 res = self.res.get(timeout=0.25)
@@ -173,7 +174,7 @@ class Runner:
                     raise RuntimeError("处理进程异常退出（可能超出内存上限）")
                 if time.time() > deadline:
                     self._kill()
-                    raise TimeoutError(f"处理超过 {self.cfg['timeout_s']} 秒，已中止")
+                    raise TimeoutError(f"处理超过 {int(deadline - start)} 秒，已中止")
         if res[0] == "err":
             raise RuntimeError(res[1])
         return res[1]
