@@ -10,6 +10,7 @@
 
 | 版本 | Windows x64 安装包 | 更新说明 |
 | --- | --- | --- |
+| v1.13.4 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.4/FormatConverter-Setup-1.13.4.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.4) |
 | v1.13.3 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.3/FormatConverter-Setup-1.13.3.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.3) |
 | v1.13.2 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.2/FormatConverter-Setup-1.13.2.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.2) |
 | v1.13.1 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.1/FormatConverter-Setup-1.13.1.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.1) |

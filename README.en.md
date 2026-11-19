@@ -10,6 +10,7 @@ A Windows desktop app for batch conversion of images, documents, spreadsheets, v
 
 | Version | Windows x64 installer | Release notes |
 | --- | --- | --- |
+| v1.13.4 | [Download installer](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.4/FormatConverter-Setup-1.13.4.exe) | [View release](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.4) |
 | v1.13.3 | [Download installer](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.3/FormatConverter-Setup-1.13.3.exe) | [View release](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.3) |
 | v1.13.2 | [Download installer](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.2/FormatConverter-Setup-1.13.2.exe) | [View release](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.2) |
 | v1.13.1 | [Download installer](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.1/FormatConverter-Setup-1.13.1.exe) | [View release](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.1) |
