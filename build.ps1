@@ -15,6 +15,10 @@ pyinstaller --noconfirm --windowed --name "FormatConverter" `
     --workpath "$out\work" --specpath "$out\work" --distpath "$out\dist" app.py
 if ($LASTEXITCODE) { throw "PyInstaller 失败" }
 
+# 精简：删去用不到的软件 OpenGL 渲染器和 Qt 自带翻译（界面文字由程序自己提供），减小体积、加快启动读取
+$qt = "$out\dist\FormatConverter\_internal\PyQt6\Qt6"
+Remove-Item "$qt\bin\opengl32sw.dll", "$qt\translations" -Recurse -Force -ErrorAction SilentlyContinue
+
 $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
           "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $iscc) { throw "未找到 Inno Setup 6：winget install JRSoftware.InnoSetup" }

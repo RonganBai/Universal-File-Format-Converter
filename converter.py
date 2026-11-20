@@ -11,16 +11,47 @@ import subprocess
 import tempfile
 import zipfile
 from dataclasses import dataclass, field
-from xml.sax.saxutils import escape
+import importlib
 
-import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageSequence
 
-try:
-    import pillow_heif
-    pillow_heif.register_heif_opener()
-except Exception:  # pragma: no cover
-    pillow_heif = None
+
+class _LazyModule:
+    """首次访问属性时才导入模块：主窗口启动和待机时不加载 numpy（转换在隔离子进程中进行）。"""
+    def __init__(self, name):
+        self._name, self._mod = name, None
+
+    def __getattr__(self, attr):
+        if self._mod is None:
+            self._mod = importlib.import_module(self._name)
+        return getattr(self._mod, attr)
+
+
+np = _LazyModule("numpy")
+pillow_heif = None
+_HEIF_TRIED = False
+
+
+def _heif():
+    """按需注册 HEIC / HEIF 读写支持，只做一次。"""
+    global pillow_heif, _HEIF_TRIED
+    if not _HEIF_TRIED:
+        _HEIF_TRIED = True
+        try:
+            import pillow_heif as ph
+            ph.register_heif_opener()
+            pillow_heif = ph
+        except Exception:  # pragma: no cover
+            pillow_heif = None
+    return pillow_heif
+
+
+def escape(s, entities=None):
+    """与 xml.sax.saxutils.escape 相同，避免启动时导入 xml.sax / urllib。"""
+    s = s.replace("&", "&amp;").replace(">", "&gt;").replace("<", "&lt;")
+    for k, v in (entities or {}).items():
+        s = s.replace(k, v)
+    return s
 
 # 安全限制（由主程序按设置覆盖）
 SETTINGS = {"strip_meta": True, "max_mb": 500, "max_mpix": 200, "max_unzip_mb": 1024}
@@ -85,6 +116,7 @@ class LimitError(ValueError):
 
 def check_limits(path, kind=None):
     """处理前检查：文件大小、压缩包解压后体积（防压缩炸弹）、图像像素上限。视频转换上限至少 4 GB。"""
+    _heif()
     mb = os.path.getsize(path) / 2 ** 20
     cap = max(SETTINGS["max_mb"], 4096) if kind == "video" else SETTINGS["max_mb"]
     if mb > cap:
@@ -346,6 +378,7 @@ def _strip_rtf(s: str) -> str:
 
 
 def load(path: str) -> Content:
+    _heif()
     name = os.path.splitext(os.path.basename(path))[0]
     ext = os.path.splitext(path)[1].lower().lstrip(".")
     c = Content(title=name)
@@ -802,7 +835,7 @@ def save_image(img, path, fmt):
             bg.paste(img, mask=img.split()[-1] if img.mode == "RGBA" else None)
             img = bg
         if fmt == "HEIC":
-            if pillow_heif is None:
+            if _heif() is None:
                 raise RuntimeError("HEIC 需要安装 pillow-heif")
             img.save(path, "HEIF", quality=PARAMS.get("quality") or 90)
         elif fmt == "DDS":
@@ -1376,6 +1409,7 @@ def assess(c, kind, fmt):
 
 def convert_into(src, base, fmt, kind=None, params=None):
     """读取 src 并写出到 base（不含扩展名）；返回 {files, meta, level, notes}。"""
+    _heif()
     _EXIF["data"] = None
     kind = kind or ("image" if fmt in IMAGE_FORMATS else "doc" if fmt in DOC_FORMATS
                     else "sheet" if fmt in SHEET_FORMATS else "video" if fmt in VIDEO_FORMATS else "vector")

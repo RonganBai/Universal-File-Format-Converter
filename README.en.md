@@ -10,6 +10,7 @@ A Windows desktop app for batch conversion of images, documents, spreadsheets, v
 
 | Version | Windows x64 installer | Release notes |
 | --- | --- | --- |
+| v1.14.0 | [Download installer](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.14.0/FormatConverter-Setup-1.14.0.exe) | [View release](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.14.0) |
 | v1.13.4 | [Download installer](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.4/FormatConverter-Setup-1.13.4.exe) | [View release](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.4) |
 | v1.13.3 | [Download installer](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.3/FormatConverter-Setup-1.13.3.exe) | [View release](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.3) |
 | v1.13.2 | [Download installer](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.2/FormatConverter-Setup-1.13.2.exe) | [View release](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.2) |
@@ -27,7 +28,7 @@ A Windows desktop app for batch conversion of images, documents, spreadsheets, v
 
 1. Run the Windows installer, then open Format Converter.
 2. Drop files or folders into the window, or click **Add Files**.
-3. Choose an output format to start converting. The app saves files in date-based folders under `格式转换输出` in your user directory by default. Change the location under **Settings → General**.
+3. Pick a category and format under **② Target format**, then click **Start**. The app saves files in date-based folders under `格式转换输出` in your user directory by default. Change the location under **Settings → General**.
 4. Choose Simplified Chinese or English on first launch. To switch later, click **EN / 中文** in the title bar. The app saves your choice automatically.
 
 ## Features
@@ -36,6 +37,7 @@ A Windows desktop app for batch conversion of images, documents, spreadsheets, v
 - Convert videos to MP4, MOV, MKV, WEBM, AVI, WMV, FLV, TS, MTS, M2TS, MPG, MPEG, 3GP, and VOB. Choose H.264, H.265/HEVC, AV1, VP9, VP8, ProRes 422 HQ, DNxHR HQ, MPEG-2, or MJPEG, or keep the original codec to remux the video. If a codec is incompatible with the container, the app uses the recommended codec and reports the change in the result.
 - Save conversion presets, including video codec and maximum dimension. Use the Tasks and History pages to check progress and results.
 - Drop files or folders on the floating ball to choose from up to six quick formats. It can dock to a screen edge and stay available in the background. Right-click it to open the main window, settings, or output folder, or to quit.
+- Every feature is in the left sidebar, which can collapse to icons only.
 - Switch between light and dark modes and customize the background tint and accent color.
 
 ## Run from source
