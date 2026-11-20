@@ -10,6 +10,7 @@
 
 | 版本 | Windows x64 安装包 | 更新说明 |
 | --- | --- | --- |
+| v1.14.0 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.14.0/FormatConverter-Setup-1.14.0.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.14.0) |
 | v1.13.4 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.4/FormatConverter-Setup-1.13.4.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.4) |
 | v1.13.3 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.3/FormatConverter-Setup-1.13.3.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.3) |
 | v1.13.2 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.2/FormatConverter-Setup-1.13.2.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.2) |
@@ -27,7 +28,7 @@
 
 1. 运行安装包，安装后打开「格式转换器」。
 2. 拖入文件或文件夹，也可以点「添加文件」。
-3. 选择目标格式开始转换。结果默认保存到用户目录下的 `格式转换输出\日期`，可在「设置 → 常规」修改。
+3. 在「② 目标格式」中选择分类和格式，点击「开始转换」。结果默认保存到用户目录下的 `格式转换输出\日期`，可在「设置 → 常规」修改。
 4. 首次启动时可选择简体中文或 English。之后可点击窗口标题栏的「EN / 中文」切换语言，选择会自动保存。
 
 ## 功能
@@ -36,6 +37,7 @@
 - 视频支持 MP4、MOV、MKV、WEBM、AVI、WMV、FLV、TS、MTS、M2TS、MPG、MPEG、3GP 和 VOB。可选 H.264、H.265/HEVC、AV1、VP9、VP8、ProRes 422 HQ、DNxHR HQ、MPEG-2、MJPEG，或保留原编码只换封装。编码与容器不兼容时，程序会采用推荐编码并在结果中说明。
 - 预设可保存常用转换配置，包括视频编码和最长边。任务和历史页面可查看转换进度与结果。
 - 悬浮球支持拖入文件或文件夹、最多六种快捷格式、屏幕边缘吸附和后台常驻。右键可打开主窗口、设置或输出目录，也可退出程序。
+- 左侧菜单栏集中所有功能，可收起为仅图标。
 - 可切换浅色和深色模式，并自定义背景色与强调色。
 
 ## 从源码运行

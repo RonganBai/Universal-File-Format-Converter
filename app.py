@@ -42,7 +42,7 @@ CAPS = {
 CAPS_COMMON = "无法识别的文件只生成信息预览；视频转 GIF / WEBP 为动图，转视频类格式为完整转码，转其他格式只取一帧，音频只生成文件信息；结果会标注「完整转换」「部分输出」「仅生成预览」或「失败」。"
 SYNC_ENV = ("OneDrive", "OneDriveCommercial", "OneDriveConsumer")
 
-VERSION = "1.13.4"
+VERSION = "1.14.0"
 HERE = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__))
 ASSETS = os.path.join(getattr(sys, "_MEIPASS", HERE), "assets")
 CONFIG = os.path.join(os.environ.get("APPDATA", HERE), "格式转换器", "config.json")
@@ -947,8 +947,8 @@ class Main(QWidget):
         self.setMinimumSize(900, 660)
         self._ov_cursor = None
         QApplication.instance().installEventFilter(self)          # 边缘按下 → 系统缩放
-        self.edge_timer = QTimer(self, interval=40, timeout=self.poll_edges)   # 边缘 / 角落光标
-        self.edge_timer.start()
+        # 边缘 / 角落光标：只在鼠标位于窗口上时轮询，离开、最小化或隐藏到托盘时停止，待机不占 CPU
+        self.edge_timer = QTimer(self, interval=40, timeout=self.poll_edges)
         self.cfg = load_cfg()
         global LANG
         LANG = self.cfg.get("lang", "zh")
@@ -1788,8 +1788,11 @@ class Main(QWidget):
         if QApplication.mouseButtons() != Qt.MouseButton.NoButton:
             return
         shape = None
-        if self.isVisible():
-            under = QApplication.widgetAt(QCursor.pos())
+        pos = QCursor.pos()
+        if not self.isVisible() or self.isMinimized() or not self.frameGeometry().adjusted(-4, -4, 4, 4).contains(pos):
+            self.edge_timer.stop()
+        elif self.isVisible():
+            under = QApplication.widgetAt(pos)
             if under is not None and under.window() is self:
                 shape = self._shape(self._edges(self.mapFromGlobal(QCursor.pos())))
         if shape != self._ov_cursor:
@@ -1805,6 +1808,9 @@ class Main(QWidget):
                 round_popup(obj)
             elif isinstance(obj, (QPushButton, QCheckBox, QRadioButton, QComboBox)):
                 obj.setCursor(Qt.CursorShape.PointingHandCursor)
+        if (ev.type() in (ev.Type.Enter, ev.Type.MouseMove, ev.Type.HoverMove) and not self.edge_timer.isActive()
+                and isinstance(obj, QWidget) and obj.window() is self):
+            self.edge_timer.start()
         if (ev.type() == ev.Type.MouseButtonPress and isinstance(obj, QWidget) and obj.window() is self
                 and ev.button() == Qt.MouseButton.LeftButton):
             e = self._edges(self.mapFromGlobal(ev.globalPosition().toPoint()))
