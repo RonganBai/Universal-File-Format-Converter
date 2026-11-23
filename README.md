@@ -2,7 +2,7 @@
 
 **简体中文** · [English](README.en.md)
 
-适用于 Windows 的桌面批量转换工具，支持图像、文档、电子表格、矢量图和视频。
+适用于 Windows 的桌面批量转换工具，支持图像、文档、电子表格、矢量图和视频，并附带一个独立的备忘录与桌面便签小窗。
 
 ## 下载安装
 
@@ -10,6 +10,7 @@
 
 | 版本 | Windows x64 安装包 | 更新说明 |
 | --- | --- | --- |
+| v1.15.0 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.15.0/FormatConverter-Setup-1.15.0.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.15.0) |
 | v1.14.0 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.14.0/FormatConverter-Setup-1.14.0.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.14.0) |
 | v1.13.4 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.4/FormatConverter-Setup-1.13.4.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.4) |
 | v1.13.3 | [下载安装包](https://github.com/RonganBai/Universal-File-Format-Converter/releases/download/v1.13.3/FormatConverter-Setup-1.13.3.exe) | [查看发布](https://github.com/RonganBai/Universal-File-Format-Converter/releases/tag/v1.13.3) |
@@ -37,8 +38,24 @@
 - 视频支持 MP4、MOV、MKV、WEBM、AVI、WMV、FLV、TS、MTS、M2TS、MPG、MPEG、3GP 和 VOB。可选 H.264、H.265/HEVC、AV1、VP9、VP8、ProRes 422 HQ、DNxHR HQ、MPEG-2、MJPEG，或保留原编码只换封装。编码与容器不兼容时，程序会采用推荐编码并在结果中说明。
 - 预设可保存常用转换配置，包括视频编码和最长边。任务和历史页面可查看转换进度与结果。
 - 悬浮球支持拖入文件或文件夹、最多六种快捷格式、屏幕边缘吸附和后台常驻。右键可打开主窗口、设置或输出目录，也可退出程序。
-- 左侧菜单栏集中所有功能，可收起为仅图标。
+- 备忘录：与文件转换分开的独立分区，可新建、搜索、置顶、重命名便签，自动保存。支持粘贴、拖入或插入图片，拖动即可调整图片大小。始终置顶的桌面便签小窗最多同时显示 3 张自选便签，向下排列、可分别折叠，双击名字即可重命名，与主窗口实时同步。
+- 左侧菜单栏分为「文件转换」和「备忘录」两组，可收起为仅图标。
 - 可切换浅色和深色模式，并自定义背景色与强调色。
+
+## 与「下载管家」联动（可选）
+
+[下载管家](https://github.com/RonganBai/Download-File-Manager)（[下载安装包](https://github.com/RonganBai/Download-File-Manager/releases/latest)）是另一个独立的小工具，自动按类型整理下载文件夹、清理旧文件。两个软件可以只装其中一个；都装了时会自动联动：
+
+- 在下载管家里右键文件 →「转换为」，列出与悬浮球相同的常用格式，点一下即在后台转换，完成后托盘提示，点提示打开输出文件夹。
+- 选「更多格式…」会把文件加入格式转换器的主窗口列表。
+
+其他软件也可以这样调用（格式转换器已在运行时会交给运行中的那个，不会再开一个）：
+
+```powershell
+FormatConverter.exe --to PNG --from 我的工具 a.heic b.webp
+```
+
+`--to` 可写 `PNG`、`image:PNG` 或 `preset:<预设 id>`；不写 `--to` 则只把文件加入列表。程序路径、常用格式和支持的扩展名写在 `%APPDATA%\格式转换器\integration.json`。
 
 ## 从源码运行
 

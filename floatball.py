@@ -60,6 +60,7 @@ QPushButton#fmt:pressed, QPushButton#act:pressed {{ background:{t['accent']}; co
 QProgressBar {{ border:none; background:{t['btnb']}; max-height:5px; min-height:5px; border-radius:2px; }}
 QProgressBar::chunk {{ background:{t['accent']}; border-radius:2px; }}
 QScrollArea {{ border:none; background:transparent; }}
+QScrollArea#mod, QWidget#mod {{ background:{t['mod']}; border:1px solid {t['cardb']}; border-radius:8px; }}
 QAbstractScrollArea > QWidget#qt_scrollarea_viewport, QScrollArea > QWidget > QWidget {{ background:transparent; }}
 QScrollBar:vertical {{ background:transparent; width:6px; }}
 QScrollBar::handle:vertical {{ background:{t['btnb']}; border-radius:3px; }}
@@ -130,8 +131,8 @@ class FloatBall(QWidget):
         # ---- 面板
         self.page_choose = QWidget(self)
         v = QVBoxLayout(self.page_choose)
-        v.setContentsMargins(12, 10, 8, 12)
-        v.setSpacing(6)
+        v.setContentsMargins(12, 12, 12, 12)          # 各模块与面板边缘留出距离
+        v.setSpacing(8)
         head = QHBoxLayout()
         self.count = QLabel(objectName="big")
         head.addWidget(self.count, 1)
@@ -171,7 +172,7 @@ class FloatBall(QWidget):
         self.names = QVBoxLayout(self.names_box)   # 每个文件一行，右侧小 ✕ 可单独移除
         self.names.setSpacing(0)
         self.names.setContentsMargins(0, 0, 0, 0)
-        self.names_area = QScrollArea()
+        self.names_area = QScrollArea(objectName="mod")
         self.names_area.setWidgetResizable(True)
         self.names_area.setWidget(self.names_box)
         self.names_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -180,10 +181,11 @@ class FloatBall(QWidget):
         self.btn_more.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_more.clicked.connect(self.toggle_all)
         v.addWidget(self.btn_more)
-        self.grid_box = QWidget()
+        self.grid_box = QWidget(objectName="mod")
+        self.grid_box.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.grid = QGridLayout(self.grid_box)
         self.grid.setSpacing(6)
-        self.grid.setContentsMargins(0, 4, 4, 0)
+        self.grid.setContentsMargins(8, 8, 8, 8)
         v.addWidget(self.grid_box)
         self.status = QLabel(objectName="sub", alignment=Qt.AlignmentFlag.AlignCenter)
         self.status.setWordWrap(True)
@@ -552,7 +554,7 @@ class FloatBall(QWidget):
         else:
             rr.adjust(0, -ext, 0, 0)
         hot = self.drag_hot and self.mode in ("drop", "panel")
-        bg = QColor(self.t["soft"] if hot else self.t["card"])
+        bg = QColor(self.t["soft"] if hot else self.t["frame"])   # 面板底色比内部模块深
         bg.setAlpha(250)
         top = self.bubble_color()
         if t < 0.5:   # 气泡 / 球：上亮下暗的渐变，更有质感
@@ -564,9 +566,10 @@ class FloatBall(QWidget):
         else:
             p.setBrush(self._mix(top, bg, t))
         if t > 0.5:
-            p.setPen(QPen(QColor(self.t["accent"]), 1.5, Qt.PenStyle.DashLine) if hot else QPen(QColor(self.t["cardb"]), 1))
+            p.setPen(QPen(QColor(self.t["accent"]), 2, Qt.PenStyle.DashLine) if hot
+                     else QPen(QColor(self.t["accent"]).darker(150), 2))     # 深色主题色描边
         else:
-            p.setPen(QPen(QColor(255, 255, 255, 60), 1))
+            p.setPen(QPen(QColor(self.t["accent"]).darker(150), 1.5))
         rad = rad if t < 0.5 else 14 * t + rad * (1 - t)
         p.drawRoundedRect(rr.adjusted(1, 1, -1, -1), rad, rad)
         if t >= 0.35:
