@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (QSizePolicy, QApplication, QFileDialog, QGridLayout
                              QPushButton, QStackedWidget, QVBoxLayout, QWidget, QProgressBar, QFrame,
                              QCheckBox, QRadioButton, QSystemTrayIcon, QMenu,
                              QFileIconProvider, QAbstractItemView, QTextBrowser,
-                             QScrollArea, QSpinBox, QComboBox, QTreeWidget, QTreeWidgetItem, QLineEdit,
+                             QScrollArea, QSpinBox, QComboBox, QTreeWidget, QTreeWidgetItem, QLineEdit, QPlainTextEdit,
                              QHeaderView)
 
 import converter
@@ -42,7 +42,8 @@ CAPS = {
 CAPS_COMMON = "无法识别的文件只生成信息预览；视频转 GIF / WEBP 为动图，转视频类格式为完整转码，转其他格式只取一帧，音频只生成文件信息；结果会标注「完整转换」「部分输出」「仅生成预览」或「失败」。"
 SYNC_ENV = ("OneDrive", "OneDriveCommercial", "OneDriveConsumer")
 
-VERSION = "1.14.0"
+VERSION = "1.15.0"
+BUTLER_URL = "https://github.com/RonganBai/Download-File-Manager/releases/latest"   # 相关应用「下载管家」
 HERE = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__))
 ASSETS = os.path.join(getattr(sys, "_MEIPASS", HERE), "assets")
 CONFIG = os.path.join(os.environ.get("APPDATA", HERE), "格式转换器", "config.json")
@@ -52,12 +53,12 @@ BORDER = 6  # 窗口四周可拖拽缩放的宽度
 IMG_EXT = {"png", "jpg", "jpeg", "bmp", "gif", "webp", "ico", "tif", "tiff"}
 
 THEMES = {
-    "dark": dict(frame="#17171a", border="#2c2c31", text="#e4e4e7", muted="#a1a1aa", faint="#71717a",
+    "dark": dict(mod="#26262c", frame="#17171a", border="#2c2c31", text="#e4e4e7", muted="#a1a1aa", faint="#71717a",
                  card="#1e1e22", cardb="#2a2a30", nav="#141417", area="#25252a", areab="#303037",
                  btn="#2b2b31", btnh="#35353c", btnb="#3a3a42", inp="#202024", list="#19191c", listb="#3a3a42",
                  accent="#3b82f6", accenth="#5b9bff", soft="#1f2c47", softt="#9cc2ff", sel="#24365a",
                  sep="#303036", warn="#e3b341", tbh="#2a2a2f", tbp="#33333a", knob_off="#4a4a52", hl="#3b82f6"),
-    "light": dict(frame="#e9ebef", border="#d3d7de", text="#2b2f36", muted="#5c6370", faint="#8a909b",
+    "light": dict(mod="#fbfcfd", frame="#e9ebef", border="#d3d7de", text="#2b2f36", muted="#5c6370", faint="#8a909b",
                   card="#f3f4f7", cardb="#dcdfe5", nav="#e3e6eb", area="#eceef2", areab="#d8dce3",
                   btn="#f8f9fb", btnh="#eef0f4", btnb="#cfd4dc", inp="#f8f9fb", list="#eef0f3", listb="#c9ced7",
                   accent="#3a73d6", accenth="#4c84e6", soft="#d6e2f7", softt="#2256b5", sel="#cddcf6",
@@ -91,7 +92,7 @@ def compose_palette(bg=None, accent=None):
         t = dict(base)
         dark = mode == "dark"
         if tint:
-            for k in ("frame", "card", "nav", "area", "btn", "btnh", "inp", "list", "tbh", "tbp",
+            for k in ("mod", "frame", "card", "nav", "area", "btn", "btnh", "inp", "list", "tbh", "tbp",
                       "cardb", "border", "areab", "btnb", "listb", "sep"):
                 t[k] = _mix(base[k], tint, 0.09 if dark else 0.10)
         if PALETTE["accent"] != "blue":
@@ -130,6 +131,28 @@ QSpinBox:hover, QComboBox:hover, QLineEdit:hover { border-color:@accent; }
 #titleSep { background:@sep; min-width:1px; max-width:1px; min-height:16px; max-height:16px; }
 #side { background:@nav; border-right:1px solid @cardb; border-radius:0; border-bottom-left-radius:10px; }
 #side[hl="true"] { border:2px solid @hl; border-radius:10px; }
+#sideHead { color:@faint; font-size:11px; font-weight:bold; padding:6px 0 0 10px; }
+#memoList::item { padding:8px 10px; }
+QPlainTextEdit, QTextEdit { background:@inp; border:1px solid @btnb; border-radius:10px; padding:8px 10px; color:@text;
+                 font-size:14px; selection-background-color:@accent; }
+QPlainTextEdit:focus, QTextEdit:focus { border-color:@accent; }
+#memoFloat QFrame#notePanel { background:@mod; border:1px solid @cardb; border-radius:10px; }
+#memoFloat QFrame#notePanel:hover { border-color:@btnb; }
+#memoFloat QTextEdit#memoEdit { background:transparent; border:none; padding:0 2px; }
+QPushButton#mfAdd { background:transparent; border:1px dashed @btnb; border-radius:7px; padding:3px 10px;
+                    color:@muted; font-size:12px; }
+QPushButton#mfAdd:hover { color:@accent; border-color:@accent; background:@btnh; }
+QLabel#mfTitle { padding:3px 4px 3px 6px; font-weight:bold; color:@text; }
+QLineEdit#mfRename { padding:2px 6px; font-weight:bold; }
+QLineEdit#memoTitle { background:transparent; border:1px solid transparent; border-radius:8px; padding:3px 6px;
+                      font-size:16px; font-weight:bold; color:@text; }
+QLineEdit#memoTitle:hover { border-color:@btnb; }
+QLineEdit#memoTitle:focus { background:@inp; border-color:@accent; }
+QPushButton#mfBtn, QPushButton#mfClose { background:transparent; border:1px solid @btnb; border-radius:7px; padding:0;
+                      color:@muted; font-family:"Segoe Fluent Icons","Segoe MDL2 Assets"; font-size:11px; }
+QPushButton#mfBtn:hover { background:@btnh; color:@text; border-color:@accent; }
+QPushButton#mfClose:hover { background:#e5484d; color:white; border-color:#e5484d; }
+#mfInfo { color:@faint; font-size:11px; }
 #sideSep { background:@sep; margin:2px 6px; }
 QPushButton#sideBtn { background:transparent; border:1px solid transparent; border-radius:8px; padding:0; text-align:left; }
 QPushButton#sideBtn:hover { background:@btnh; border-color:@btnb; }
@@ -420,7 +443,34 @@ EN = {
     "配置文件：": "Config: ", "临时文件：": "Temp files: ",
     "以下 {n} 个日期文件夹已超过 {d} 天，确定后会移到回收站：": "These {n} dated folder(s) are older than {d} days and will be moved to the Recycle Bin:",
     "悬浮球": "Floating ball", "常用格式…": "Quick formats…", "常用格式": "Quick formats", "深色模式": "Dark mode",
-    "已选 {n}/{m}": "{n}/{m} selected", "收起菜单": "Collapse", "主页": "Home", "外观": "Appearance", "背景色调": "Background tint", "按键高光色": "Accent color", "默认": "Default", "石墨": "Graphite", "深海": "Ocean", "森林": "Forest", "暖沙": "Sand", "暮紫": "Dusk", "玫瑰": "Rose", "蓝": "Blue", "紫": "Violet", "青": "Teal", "绿": "Green", "橙": "Orange", "粉": "Pink", "红": "Red", "点击即可预览；保存设置后生效，不保存则恢复原来的颜色。深色 / 浅色模式都会套用。": "Click to preview. Saved with the settings; leaving without saving restores the previous colors. Applies to both dark and light mode.", "悬浮球上显示的格式（最多 6 种）": "Formats shown on the floating ball (max 6)", "悬浮球 · 常用格式": "Floating ball · Quick formats", "已开启": "on", "已关闭": "off", "展开菜单": "Expand", "未保存的修改": "Unsaved changes",
+    "已选 {n}/{m}": "{n}/{m} selected", "收起菜单": "Collapse", "主页": "Home", "文件转换": "Converter", "备忘录": "Memos", "便签小窗": "Sticky", "全部便签": "All notes",
+    "打开备忘录": "Open memos", "显示便签小窗": "Show sticky note", "新建便签": "New note", "空白便签": "Empty note",
+    "今天": "Today", "已保存 · {t}": "Saved · {t}", "写点什么…内容会自动保存": "Write something… it saves automatically",
+    "关闭便签小窗": "Close sticky note", "展开": "Expand", "收起": "Collapse", "在主窗口中管理": "Manage in main window",
+    "搜索便签": "Search notes", "新建": "New", "置顶": "Pin", "取消置顶": "Unpin", "在小窗中打开": "Open in sticky note",
+    "删除": "Delete", "删除便签": "Delete note", "确定删除这条便签？删除后无法恢复。": "Delete this note? This cannot be undone.",
+    "写点什么…可粘贴或拖入图片，内容会自动保存": "Write something… paste or drop images; it saves automatically",
+    "切换便签、重命名、插入图片": "Switch note, rename, insert image", "关闭这个小窗": "Close this sticky note",
+    "按住拖动 · 双击收起 / 展开": "Drag to move · double-click to collapse / expand", "重命名": "Rename",
+    "插入图片…": "Insert image…", "插入图片": "Insert image", "图片": "Images", "再开一个小窗（{n}/{m}）": "Open another sticky note ({n}/{m})",
+    "图片大小": "Image size", "小图": "Small", "中图": "Medium", "大图": "Large", "原始大小": "Original size",
+    "适应宽度": "Fit width", "删除图片": "Delete image", "{n} 张图片": "{n} image(s)",
+    "也可以直接粘贴或拖入图片；拖动图片右边缘、或按住 Ctrl 滚动滚轮调整大小": "You can also paste or drop images. Drag an image's right edge, or Ctrl + mouse wheel over it, to resize.",
+    "点击重命名；留空则用第一行作为标题": "Click to rename. Leave empty to use the first line as the title.",
+    "从小窗移除（便签内容保留）": "Remove from sticky (the note is kept)", "折叠": "Collapse",
+    "双击或按 F2 重命名 · 按住拖动小窗": "Double-click or F2 to rename · drag to move",
+    "在下方再加一张（{n}/{m}）": "Add one below ({n}/{m})", "添加便签（{n}/{m}）": "Add note ({n}/{m})",
+    "相关应用": "Companion apps", "访问下载页": "Download page", "下载「下载管家」": "Get Download Butler",
+    "下载管家：自动按类型整理下载文件夹、清理旧文件。": "Download Butler: sorts your Downloads folder by type and cleans up old files.",
+    "已安装：在它的文件右键菜单里选「转换为」，即可直接交给本程序转换。": "Installed: right-click a file there and choose “转换为” (Convert to) to convert it here.",
+    "安装后，它的文件右键菜单会多出「转换为」，直接交给本程序转换。": "Once installed, its file right-click menu gains “转换为” (Convert to), which hands files to this app.",
+    "无法识别目标格式": "Unknown target format",
+    "「{f}」不是可用的目标格式，文件已加入列表，请手动选择。": "“{f}” is not an available target format. The files were added to the list; pick a format there.",
+    "命令行": "Command line", "{ok} 个成功": "{ok} succeeded", "{n} 个失败": "{n} failed",
+    "{src} · 转换为 {fmt} 完成": "{src} · converted to {fmt}", "点击打开输出文件夹": "Click to open the output folder",
+    "开始转换": "Converting", "{src}：{n} 个文件 → {fmt}": "{src}: {n} file(s) → {fmt}",
+    "共 {n} 条": "{n} note(s)", "{n} 字": "{n} chars", "点「新建」写第一条便签": "Click New to write your first note",
+    "没有找到匹配的便签": "No matching notes", "更新于 {t}": "Updated {t}", "外观": "Appearance", "背景色调": "Background tint", "按键高光色": "Accent color", "默认": "Default", "石墨": "Graphite", "深海": "Ocean", "森林": "Forest", "暖沙": "Sand", "暮紫": "Dusk", "玫瑰": "Rose", "蓝": "Blue", "紫": "Violet", "青": "Teal", "绿": "Green", "橙": "Orange", "粉": "Pink", "红": "Red", "点击即可预览；保存设置后生效，不保存则恢复原来的颜色。深色 / 浅色模式都会套用。": "Click to preview. Saved with the settings; leaving without saving restores the previous colors. Applies to both dark and light mode.", "悬浮球上显示的格式（最多 6 种）": "Formats shown on the floating ball (max 6)", "悬浮球 · 常用格式": "Floating ball · Quick formats", "已开启": "on", "已关闭": "off", "展开菜单": "Expand", "未保存的修改": "Unsaved changes",
     "设置已修改但尚未保存，是否保存后再退出？": "Settings were changed but not saved. Save before leaving?",
     "继续编辑": "Keep editing", "不保存": "Don't save", "保存": "Save", "点击下方格式加入悬浮球": "Click formats below to add them to the floating ball", "完成后自动打开输出文件夹": "Open output folder when done", "常用格式设置": "Quick format settings", "设置": "Settings",
     "关闭格式转换器": "Close Format Converter", "点击 ✕ 关闭窗口时，你希望：": "When you click ✕ to close the window:",
@@ -465,6 +515,8 @@ GUIDE = {
         ("③ 转换结果", "转换好的文件显示在这里：双击直接打开，多选后可批量打开、定位到文件夹或分享。", "out"),
         ("悬浮球与托盘", "点左侧菜单「悬浮球」这一行即可开关屏幕边缘悬浮球（右侧开关显示当前状态），"
                          "下方的「常用格式」决定气泡上显示哪些格式。把文件拖到气泡上就能快速转换。", "side"),
+        ("备忘录", "左侧菜单下半部分是独立的「备忘录」：新建、搜索、置顶、重命名便签，可插入图片，内容自动保存。"
+                   "打开「便签小窗」后桌面上会出现置顶的便签小窗，最多 3 张向下排列、可分别折叠，双击便签名字即可重命名。", "side"),
         ("外观与托盘", "标题栏的月亮开关切换深色 / 浅色，「设置 → 外观」可更换背景色调和按键高光色。"
                        "关闭窗口时程序可隐藏到右下角托盘，右键托盘图标即可打开各项功能。标题栏的「?」随时查看帮助。", None),
     ],
@@ -480,6 +532,9 @@ GUIDE = {
         ("③ Results", "Converted files appear here. Double-click to open; multi-select to open, locate or share.", "out"),
         ("Floating ball", "Click the “Floating ball” row in the sidebar to turn the screen-edge ball on or off (its switch shows the state). "
                           "“Quick formats” below it chooses which formats the bubble offers. Drop files on the ball for quick conversions.", "side"),
+        ("Memos", "The lower part of the sidebar is a separate Memos section: create, search, pin and rename notes, "
+                  "add images; everything saves automatically. Turn on “Sticky” for always-on-top notes on the desktop — "
+                  "up to 3 stacked downward, each collapsible; double-click a name to rename it.", "side"),
         ("Appearance & tray", "The moon switch in the title bar toggles dark / light; Settings → Appearance changes the background tint and accent color. "
                               "When the window is closed the app can hide in the system tray — right-click its icon for quick actions. "
                               "Click “?” in the title bar for help at any time.", None),
@@ -574,6 +629,31 @@ HELP = {"zh": [
 <ul><li>程序运行时右下角显示托盘图标，单击打开主窗口，右键可快速添加文件、打开输出文件夹、开关悬浮球、退出。</li>
 <li>第一次点 ✕ 时会询问「完全退出」还是「隐藏到系统托盘」，之后按你的选择执行，可在「设置 → 常规」修改。</li></ul>
 """),
+("备忘录", """
+<h2>备忘录</h2>
+<p>备忘录和文件转换是两个独立的部分，在左侧菜单分成「文件转换」和「备忘录」两组，只共用窗口、主题和语言。</p>
+<h3>备忘录页面</h3>
+<ul><li>点左侧菜单「全部便签」打开：左边是便签列表，右边编辑。</li>
+<li>「新建」（或 <b>Ctrl+N</b>）新建便签；顶部搜索框按标题和内容筛选；「置顶」让重要便签排在最前。</li>
+<li><b>重命名</b>：直接点编辑区上方的标题输入新名字，或在列表中双击 / 右键「重命名」，也可以按 <b>F2</b>。标题留空时用第一行文字。</li>
+<li>输入后自动保存，无需点保存；「删除」前会确认，删除后无法恢复。</li></ul>
+<h3>图片</h3>
+<ul><li>点「插入图片」选择图片，也可以直接粘贴（<b>Ctrl+V</b>）截图，或把图片文件拖进便签。</li>
+<li><b>调整大小</b>：鼠标移到图片右边缘，出现 ↔ 时按住拖动；或把鼠标放在图片上按住 <b>Ctrl</b> 滚动滚轮；
+右键图片可选小 / 中 / 大 / 原始大小 / 适应宽度，或删除图片。</li>
+<li>过大的图片会先缩小到最长边 1600 像素再保存。粘贴文字时只保留纯文字，不带网页的颜色和字体。</li></ul>
+<h3>便签小窗</h3>
+<ul><li>打开左侧菜单「便签小窗」开关（或托盘右键「显示便签小窗」），桌面上出现一个始终置顶的便签小窗。</li>
+<li><b>最多 3 张，向下排列</b>：点小窗底部「＋ 添加便签」，或在主窗口选中便签点「在小窗中打开」，新便签加在下方，小窗随之向下变长。
+已满 3 张时，「在小窗中打开」会替换最下面一张。</li>
+<li><b>分别折叠</b>：每张便签右上角的「︿」（或双击标题条空白处）只折叠这一张，小窗高度跟着缩短。</li>
+<li><b>快速重命名</b>：<b>双击便签名字</b>直接输入新名字，回车确认、Esc 取消；光标在便签里时按 <b>F2</b> 也可以。</li>
+<li>「⋯」菜单：切换这张显示的便签、新建、重命名、插入图片、在下方再加一张、在主窗口中管理；「✕」把这张从小窗移除（便签内容保留）。</li>
+<li>按住便签名字、标题条或小窗边框的空白处拖动整个小窗；右下角拖动调整大小。位置、显示的便签和折叠状态会被记住。</li>
+<li>小窗和主窗口编辑同一份内容，实时同步；关闭主窗口隐藏到托盘时，小窗继续留在桌面。</li></ul>
+<h3>数据</h3>
+<ul><li>便签保存在 <code>%APPDATA%\\格式转换器\\memos.json</code>，图片在同目录的 <code>memo_images</code> 文件夹，只存在本机，不会上传。</li></ul>
+"""),
 ("设置与安全", """
 <h2>设置与安全</h2>
 <ul><li><b>常规</b>：关闭方式、输出目录。</li>
@@ -665,6 +745,31 @@ HELP = {"zh": [
 <li>It docks to the left, right or top edge; right-click for the main window, tasks, quick formats, lock / reset position, quit.</li>
 <li>The tray icon opens the window; right-click for quick actions. The first ✕ asks whether to quit or hide to the tray.</li></ul>
 """),
+("Memos", """
+<h2>Memos</h2>
+<p>Memos are separate from file conversion: the sidebar has a “Converter” group and a “Memos” group. They only share the window, theme and language.</p>
+<h3>Memos page</h3>
+<ul><li>Click “All notes” in the sidebar: notes on the left, the editor on the right.</li>
+<li>“New” (or <b>Ctrl+N</b>) creates a note; the search box filters by title and content; “Pin” keeps a note at the top.</li>
+<li><b>Rename</b>: click the title above the editor and type, double-click / right-click a note in the list, or press <b>F2</b>. An empty title falls back to the first line.</li>
+<li>Typing saves automatically. “Delete” asks first and cannot be undone.</li></ul>
+<h3>Images</h3>
+<ul><li>Click “Insert image”, paste a screenshot (<b>Ctrl+V</b>), or drop image files into a note.</li>
+<li><b>Resize</b>: drag an image's right edge when the ↔ cursor appears, or hold <b>Ctrl</b> and scroll over it;
+right-click it for Small / Medium / Large / Original size / Fit width, or to delete it.</li>
+<li>Very large images are scaled to 1600 px on the long side before saving. Pasted text keeps only plain text.</li></ul>
+<h3>Sticky notes</h3>
+<ul><li>Turn on “Sticky” in the sidebar (or “Show sticky note” in the tray menu) for an always-on-top sticky window on the desktop.</li>
+<li><b>Up to 3 notes, stacked downward</b>: click “＋ Add note” at the bottom, or select a note and click “Open in sticky note”. New notes go below and the window grows downward.
+With 3 shown, “Open in sticky note” replaces the bottom one.</li>
+<li><b>Collapse each one</b>: “︿” on a note (or double-clicking empty space in its title bar) collapses only that note, and the window shrinks.</li>
+<li><b>Quick rename</b>: <b>double-click a note's name</b> and type — Enter confirms, Esc cancels. <b>F2</b> works while the cursor is in the note.</li>
+<li>“⋯” menu: switch the note shown, create, rename, insert image, add one below, manage in the main window. “✕” removes that note from the sticky window (the note is kept).</li>
+<li>Drag a note name, title bar or the window border to move the whole window; drag the bottom-right corner to resize. Position, notes shown and collapsed states are remembered.</li>
+<li>They edit the same notes as the main window, in sync, and stay on screen when the main window hides to the tray.</li></ul>
+<h3>Data</h3>
+<ul><li>Notes are stored in <code>%APPDATA%\\格式转换器\\memos.json</code>, images in the <code>memo_images</code> folder next to it, on this computer only.</li></ul>
+"""),
 ("Settings & security", """
 <h2>Settings & security</h2>
 <ul><li><b>General</b>: close behaviour, output folder.</li>
@@ -705,6 +810,7 @@ def tr_err(msg):
     return msg
 
 
+MEMO_FILE = os.path.join(os.path.dirname(CONFIG), "memos.json")
 HISTORY_FILE = os.path.join(os.path.dirname(CONFIG), "history.json")
 
 
@@ -991,6 +1097,13 @@ class Main(QWidget):
         sl.setContentsMargins(6, 8, 6, 8)
         sl.setSpacing(4)
         self.side_btns = []
+        self.side_heads = []
+        self.memo_store = self.memo_page = self.memo_float = None   # 便签小窗（最多 3 张便签向下排列）
+        def head(key):
+            lb = SideHead(key)
+            sl.addWidget(lb)
+            self.side_heads.append(lb)
+            return lb
         def item(glyph, key, fn=None, checkable=False, nav=False):
             b = SideButton(glyph, key)
             b.setCheckable(checkable)
@@ -1005,6 +1118,7 @@ class Main(QWidget):
         sep = QFrame(objectName="sideSep")
         sep.setFixedHeight(1)
         sl.addWidget(sep)
+        head("文件转换")
         item("", "主页", self.go_home)
         self.btn_ball = item("", "悬浮球", lambda: self.ball_switch.setChecked(self.btn_ball.isChecked()), True)
         self.btn_ball.is_switch = True
@@ -1018,6 +1132,13 @@ class Main(QWidget):
         item("", "预设", self.open_presets, nav=True)
         self.btn_tasks = item("", "任务", self.open_tasks, nav=True)
         item("", "历史", self.open_history, nav=True)
+        head("备忘录")
+        item("", "全部便签", self.open_memo, nav=True)
+        self.btn_memo = item("", "便签小窗", lambda: self.set_memo_float(self.btn_memo.isChecked()), True)
+        self.btn_memo.is_switch = True
+        self.btn_memo.child = True
+        self.btn_memo.setFixedHeight(32)
+        self.btn_memo.setChecked(bool(self.cfg.get("memo_float_on")))
         sl.addStretch()
         item("", "使用引导", self.open_guide, nav=True)
         item("", "帮助手册", self.open_help, nav=True)
@@ -1230,7 +1351,11 @@ class Main(QWidget):
             b.expanded = open_
             b.setToolTip("" if open_ else tr(b.key))
             b.update()
+        for h in getattr(self, "side_heads", []):
+            h.set_open(open_)
         self.btn_fold.key = "收起菜单" if open_ else "展开菜单"
+        if hasattr(self, "btn_memo"):
+            self.btn_memo.setToolTip("" if open_ else tr("便签小窗") + "：" + (tr("已开启") if self.btn_memo.isChecked() else tr("已关闭")))
         if self.isVisible():
             QTimer.singleShot(0, self.update_min)
         if save:
@@ -1340,6 +1465,8 @@ class Main(QWidget):
                 w.update()
         if self.ball:
             self.ball.apply_theme()
+        if self.memo_float:
+            self.memo_float.apply_theme()
 
     def toggle_lang(self):
         global LANG
@@ -1354,6 +1481,10 @@ class Main(QWidget):
                 pg.load_lang()
         if self.ball:
             self.ball.rebuild()
+        if self.memo_float:
+            self.memo_float.retranslate()
+        for h in self.side_heads:
+            h.set_open(self.side_open)
 
     def update_counts(self, *_):
         if hasattr(self, "out_count"):
@@ -1363,6 +1494,7 @@ class Main(QWidget):
     # ---- 托盘
     def make_tray(self):
         self.tray = QSystemTrayIcon(QIcon(os.path.join(ASSETS, "icon.ico")), self)
+        self.tray.messageClicked.connect(self.tray_message_clicked)
         self.tray.activated.connect(lambda r: self.show_main() if r in (
             QSystemTrayIcon.ActivationReason.Trigger, QSystemTrayIcon.ActivationReason.DoubleClick) else None)
         self.tray_menu = QMenu()
@@ -1383,6 +1515,13 @@ class Main(QWidget):
         a.toggled.connect(self.set_ball)
         m.addAction(a)
         m.addAction(tr("常用格式…"), self.open_ball_settings)
+        m.addSeparator()
+        m.addAction(tr("打开备忘录"), self.show_memo_page)
+        b = QAction(tr("显示便签小窗"), m, checkable=True)
+        b.setChecked(bool(self.cfg.get("memo_float_on")))
+        b.toggled.connect(self.set_memo_float)
+        m.addAction(b)
+        m.addAction(tr("新建便签"), self.new_memo_float)
         m.addSeparator()
         m.addAction(tr("使用引导"), lambda: (self.show_main(), self.open_guide()))
         m.addAction(tr("帮助手册"), self.open_help)
@@ -1648,6 +1787,139 @@ class Main(QWidget):
 
     def save(self):
         save_cfg(self.cfg)
+        self.write_integration()
+
+    # ---- 对外联动（下载管家等其他软件；对方没装时这里什么都不影响）
+    INTEGRATION_FILE = os.path.join(os.path.dirname(CONFIG), "integration.json")
+    DEFAULT_QUICK = ["image:PNG", "image:JPEG", "doc:PDF", "image:WEBP"]
+
+    def target_formats(self):
+        return {"image": converter.IMAGE_FORMATS, "doc": converter.DOC_FORMATS, "sheet": converter.SHEET_FORMATS,
+                "vector": converter.VECTOR_FORMATS, "video": list(converter.VIDEO_FORMATS)}
+
+    def write_integration(self):
+        import bridge
+        quick = []
+        for key in (self.cfg.get("ball_formats") or self.DEFAULT_QUICK)[:6]:
+            kind, _, fmt = key.partition(":")
+            if kind == "preset":
+                pr = self.preset_by_id(fmt)
+                if pr:
+                    quick.append({"to": key, "label": pr["name"], "fmt": pr["fmt"], "kind": pr["kind"]})
+            elif fmt:
+                quick.append({"to": key, "label": fmt, "fmt": fmt, "kind": kind})
+        bridge.write_info(self.INTEGRATION_FILE,
+                          bridge.build_info(VERSION, HERE, LANG, self.target_formats(), quick))
+
+    def handle_cli(self, argv, cwd=""):
+        """命令行 / 其他软件转交来的参数：带 --to 直接后台转换，否则加入列表并打开主窗口。"""
+        import bridge
+        a = bridge.parse_args(argv, cwd or None)
+        paths = [p for p in a["paths"] if os.path.exists(p)]
+        if not a["to"]:
+            self.add_paths(paths)
+            if not a["min"] or paths:
+                self.show_main()
+            return
+        target = bridge.resolve_target(a["to"], self.target_formats(), self.preset_by_id)
+        files = []
+        for p in paths:
+            if os.path.isdir(p):
+                files += [os.path.join(r, f) for r, _, fs in os.walk(p) for f in fs]
+            else:
+                files.append(p)
+        files = list(dict.fromkeys(os.path.normpath(f) for f in files))
+        if not target or not files:
+            self.add_paths(files)
+            self.show_main()
+            if not target:
+                self.tray.showMessage(tr("无法识别目标格式"), tr("「{f}」不是可用的目标格式，文件已加入列表，请手动选择。").format(f=a["to"]),
+                                      QIcon(os.path.join(ASSETS, "icon.ico")), 6000)
+            return
+        fmt, kind, params, label = target
+        src = a["source"] or tr("命令行")
+
+        def done(task, ok, bad):
+            self.report_limit(task)
+            self._cli_dir = os.path.dirname(ok[0]) if ok else None
+            msg = tr("{ok} 个成功").format(ok=len(ok)) + ("，" + tr("{n} 个失败").format(n=len(bad)) if bad else "")
+            self.tray.showMessage(tr("{src} · 转换为 {fmt} 完成").format(src=src, fmt=label),
+                                  msg + ("　" + tr("点击打开输出文件夹") if ok else ""),
+                                  QIcon(os.path.join(ASSETS, "icon.ico")), 6000)
+        self.launch(files, fmt, kind, params, label, src, done)
+        self.tray.showMessage(tr("开始转换"), tr("{src}：{n} 个文件 → {fmt}").format(src=src, n=len(files), fmt=label),
+                              QIcon(os.path.join(ASSETS, "icon.ico")), 3000)
+
+    def tray_message_clicked(self):
+        d = getattr(self, "_cli_dir", None)
+        if d and os.path.isdir(d):
+            os.startfile(d)
+            self._cli_dir = None
+
+    # ---- 备忘录（与文件转换分开，只共用窗口、主题与语言）
+    def memos(self):
+        if self.memo_store is None:
+            import memo
+            self.memo_store = memo.MemoStore(MEMO_FILE)
+        return self.memo_store
+
+    def open_memo(self):
+        if not self.memo_page:
+            self.memo_page = MemoPage(self)
+        self.memo_page.refresh_list()
+        self.memo_page.show()
+        self.memo_page.raise_()
+
+    def show_memo_page(self):
+        self.show_main()
+        self.side_go(self.open_memo)
+
+    def set_memo_float(self, on):
+        """总开关：关掉时记住每个小窗的位置和便签，下次打开全部恢复。"""
+        self.cfg["memo_float_on"] = bool(on)
+        self.save()
+        self.apply_memo_float()
+        if self.btn_memo.isChecked() != bool(on):
+            self.btn_memo.setChecked(bool(on))
+        self.set_side(self.side_open, save=False)
+        self.build_tray_menu()
+
+    def apply_memo_float(self):
+        if self.cfg.get("memo_float_on"):
+            if not self.memo_float:
+                import memo
+                old = self.cfg.get("memo_floats")              # 早期测试版：多个独立小窗 → 合并为一个
+                if isinstance(old, list) and old and not self.cfg.get("memo_float", {}).get("panels"):
+                    self.cfg["memo_float"] = dict(old[0], panels=[{"note": x.get("note"), "h": x.get("h", 220)}
+                                                                  for x in old if isinstance(x, dict)])
+                self.memo_float = memo.MemoFloat(self, self.memos())
+            self.memo_float.show()
+            self.memo_float.raise_()
+        elif self.memo_float:
+            self.memo_float.close()
+            self.memo_float.deleteLater()
+            self.memo_float = None
+
+    def open_memo_float(self, nid):
+        """在便签小窗中显示一条便签（最多 3 张，向下排列）。"""
+        if not self.cfg.get("memo_float_on"):
+            self.set_memo_float(True)
+        elif not self.memo_float:
+            self.apply_memo_float()
+        self.memo_float.open_note(nid)
+        self.memo_float.show()
+        self.memo_float.raise_()
+        self.memo_float.activateWindow()
+
+    def new_memo_float(self):
+        if not self.cfg.get("memo_float_on"):
+            self.set_memo_float(True)
+        elif not self.memo_float:
+            self.apply_memo_float()
+        self.memo_float.new_note()
+        self.memo_float.show()
+        self.memo_float.raise_()
+        self.memo_float.activateWindow()
 
     def apply_ball(self):
         if self.cfg.get("ball_on"):
@@ -1676,8 +1948,13 @@ class Main(QWidget):
 
     def quit_app(self):
         """完全退出：关掉悬浮窗与托盘，等转换线程结束，再退出事件循环。"""
+        self._quitting = True   # 明确退出：closeEvent 不再询问 / 隐藏，否则 Qt 会因窗口拒绝关闭而取消退出
         if self.ball:
             self.ball.close()
+        if self.memo_float:
+            self.memo_float.close()
+        if self.memo_store:
+            self.memo_store.flush()
         self.tray.hide()
         for j in list(self.jobs) + ([self.worker] if getattr(self, "worker", None) else []):
             j.wait(3000)
@@ -1685,6 +1962,9 @@ class Main(QWidget):
 
     def closeEvent(self, e):
         # 第一次点 ✕ 询问，之后按记住的选择：隐藏到系统托盘 / 完全退出
+        if getattr(self, "_quitting", False):
+            e.accept()
+            return
         choice = self.cfg.get("close_choice")
         if choice not in ("hide", "quit"):
             choice = CloseAsk(self).ask()
@@ -2272,6 +2552,28 @@ class StyledDialog(QFrame):
         super().keyPressEvent(e)
 
 
+class SideHead(QLabel):
+    """左侧菜单分组标题（文件转换 / 备忘录）；菜单收起时只显示一条短分隔线。"""
+    def __init__(self, key):
+        super().__init__(objectName="sideHead")
+        self.key, self.open_ = key, True
+        self.setFixedHeight(24)
+
+    def set_open(self, on):
+        self.open_ = on
+        self.setText(tr(self.key) if on else "")
+        self.setToolTip("" if on else tr(self.key))
+        self.update()
+
+    def paintEvent(self, e):
+        if self.open_:
+            return super().paintEvent(e)
+        p = QPainter(self)
+        p.setPen(QPen(QColor(C("sep")), 1))
+        y = self.height() // 2
+        p.drawLine(10, y, self.width() - 10, y)
+
+
 class SideButton(QPushButton):
     """左侧导航项：自绘图标（Segoe Fluent Icons）+ 文字；折叠时只画图标。"""
     def __init__(self, glyph, key):
@@ -2740,6 +3042,21 @@ class SettingsDialog(StyledDialog):
             x.setWordWrap(True)
             x.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             cv.addWidget(x)
+        # 相关应用：只是推荐，两个软件各自独立下载、独立运行
+        rel = QLabel(tr("相关应用"), objectName="cardTitle")
+        cv.addSpacing(8)
+        cv.addWidget(rel)
+        butler = os.path.isdir(os.path.join(os.environ.get("APPDATA", ""), "下载管家"))
+        rr = QHBoxLayout()
+        t = QLabel(tr("下载管家：自动按类型整理下载文件夹、清理旧文件。") + "\n"
+                   +(tr("已安装：在它的文件右键菜单里选「转换为」，即可直接交给本程序转换。") if butler
+                      else tr("安装后，它的文件右键菜单会多出「转换为」，直接交给本程序转换。")), objectName="hint")
+        t.setWordWrap(True)
+        rr.addWidget(t, 1)
+        b = QPushButton(tr("访问下载页") if butler else tr("下载「下载管家」"))
+        b.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(BUTLER_URL)))
+        rr.addWidget(b, 0, Qt.AlignmentFlag.AlignTop)
+        cv.addLayout(rr)
         cv.addStretch()
         self.nav_l.addStretch()
         self.show_sec(0)
@@ -3080,6 +3397,228 @@ class Guide(StyledDialog):
         x = min(max(c.x() - self.width() // 2, 12), fr.width() - self.width() - 12)
         y = min(max(c.y() - self.height() // 2, 40), fr.height() - self.height() - 12)
         self.move(x, y)
+
+
+class MemoPage(StyledDialog):
+    """备忘录页面：左侧便签列表（搜索 / 新建），右侧编辑；内容自动保存，与便签小窗实时同步。"""
+    def __init__(self, main):
+        super().__init__(main, "备忘录")
+        self.main, self.keep = main, True
+        self.store = main.memos()
+        self.nid = None
+        wrap = QHBoxLayout()
+        wrap.setSpacing(12)
+        left = QFrame(objectName="cats")
+        left.setFixedWidth(250)
+        ll = QVBoxLayout(left)
+        ll.setContentsMargins(8, 8, 8, 8)
+        ll.setSpacing(8)
+        top = QHBoxLayout()
+        self.search = QLineEdit()
+        self.search.textChanged.connect(self.refresh_list)
+        top.addWidget(self.search, 1)
+        self.b_new = QPushButton(objectName="primary")
+        self.b_new.clicked.connect(self.new_note)
+        top.addWidget(self.b_new)
+        ll.addLayout(top)
+        self.list = QListWidget(objectName="memoList")
+        self.list.setFrameShape(QFrame.Shape.NoFrame)
+        self.list.setStyleSheet("QListWidget#memoList { border:none; background:transparent; }")
+        self.list.currentItemChanged.connect(lambda cur, _: self.load_note(cur.data(Qt.ItemDataRole.UserRole) if cur else None))
+        ll.addWidget(self.list, 1)
+        self.count = QLabel(objectName="hint")
+        ll.addWidget(self.count)
+        wrap.addWidget(left)
+
+        right = QFrame(objectName="panel")
+        rl = QVBoxLayout(right)
+        rl.setContentsMargins(14, 12, 14, 12)
+        rl.setSpacing(8)
+        bar = QHBoxLayout()
+        self.title = QLineEdit(objectName="memoTitle")     # 直接点标题即可重命名；留空则用第一行
+        self.title.editingFinished.connect(self.rename)
+        bar.addWidget(self.title, 1)
+        self.b_img = QPushButton()
+        self.b_img.clicked.connect(lambda: self.edit.pick_images())
+        self.b_pin = QPushButton()
+        self.b_pin.clicked.connect(self.toggle_pin)
+        self.b_float = QPushButton()
+        self.b_float.clicked.connect(self.open_in_float)
+        self.b_del = QPushButton(objectName="danger")
+        self.b_del.clicked.connect(self.delete_note)
+        rl.addLayout(bar)
+        tools = QHBoxLayout()                              # 按钮单独一行，标题有足够宽度，英文界面也不挤
+        tools.setSpacing(6)
+        for b in (self.b_img, self.b_pin, self.b_float, self.b_del):
+            tools.addWidget(b)
+        tools.addStretch(1)
+        rl.addLayout(tools)
+        import memo
+        self.edit = memo.NoteEdit(self.store, tr)
+        self.edit.edited.connect(self.on_edit)
+        self._html = None
+        self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list.customContextMenuRequested.connect(self.list_menu)
+        self.list.itemDoubleClicked.connect(lambda _: self.start_rename())
+        rl.addWidget(self.edit, 1)
+        self.info = QLabel(objectName="hint")
+        rl.addWidget(self.info)
+        wrap.addWidget(right, 1)
+        self.content.addLayout(wrap, 1)
+        QShortcut(QKeySequence("Ctrl+N"), self, activated=self.new_note)
+        QShortcut(QKeySequence("F2"), self, activated=self.start_rename)   # 快速重命名当前便签
+        self.store.changed.connect(self.on_store)
+        self.load_lang()
+
+    def load_lang(self):
+        self.search.setPlaceholderText(tr("搜索便签"))
+        self.b_new.setText(tr("新建"))
+        self.b_img.setText(tr("插入图片"))
+        self.b_img.setToolTip(tr("也可以直接粘贴或拖入图片；拖动图片右边缘、或按住 Ctrl 滚动滚轮调整大小"))
+        self.title.setToolTip(tr("点击重命名；留空则用第一行作为标题"))
+        self.b_float.setText(tr("在小窗中打开"))
+        self.b_del.setText(tr("删除"))
+        self.refresh_list()
+
+    def refresh_list(self):
+        notes = self.store.sorted(self.search.text())
+        keep = self.nid
+        self.list.blockSignals(True)
+        self.list.clear()
+        import memo
+        for n in notes:
+            it = QListWidgetItem(("📌 " if n.get("pinned") else "") + memo.note_title(n, tr("空白便签")) + "\n"
+                                 + memo.when(n.get("updated", 0), tr("今天")))
+            it.setData(Qt.ItemDataRole.UserRole, n["id"])
+            self.list.addItem(it)
+            if n["id"] == keep:
+                self.list.setCurrentItem(it)
+        self.list.blockSignals(False)
+        self.count.setText(tr("共 {n} 条").format(n=len(self.store.notes)))
+        if self.list.currentItem() is None:
+            self.load_note(notes[0]["id"] if notes else None)
+            if self.list.count():
+                self.list.blockSignals(True)
+                self.list.setCurrentRow(0)
+                self.list.blockSignals(False)
+        else:
+            self.load_note(keep)
+
+    def load_note(self, nid):
+        import memo
+        self.nid = nid
+        n = self.store.get(nid)
+        self.edit.load(n)
+        self._html = n.get("html") if n else None
+        self.edit.setEnabled(n is not None)
+        self.title.setEnabled(n is not None)
+        self.edit.setPlaceholderText(tr("写点什么…可粘贴或拖入图片，内容会自动保存") if n else
+                                     (tr("没有找到匹配的便签") if self.search.text() else tr("点「新建」写第一条便签")))
+        for b in (self.b_img, self.b_pin, self.b_float, self.b_del):
+            b.setEnabled(n is not None)
+        self.b_pin.setText(tr("取消置顶") if n and n.get("pinned") else tr("置顶"))
+        self.update_info()
+
+    def update_info(self):
+        import memo
+        n = self.store.get(self.nid)
+        if not self.title.hasFocus():
+            self.title.setText((n.get("title") or "") if n else "")
+        self.title.setPlaceholderText(memo.note_title({"text": n.get("text", "")}, tr("空白便签")) if n else tr("备忘录"))
+        k = memo.image_count(n) if n else 0
+        self.info.setText(tr("已保存 · {t}").format(t=memo.when(n["updated"], tr("今天"))) + "　·　"
+                          + tr("{n} 字").format(n=len(n["text"])) + ("　·　" + tr("{n} 张图片").format(n=k) if k else "")
+                          if n else "")
+
+    def update_item(self):
+        """输入时只更新当前列表项的文字，不重新排序，避免列表跳动。"""
+        import memo
+        it = self.list.currentItem()
+        n = self.store.get(self.nid)
+        if it and n:
+            it.setText(("📌 " if n.get("pinned") else "") + memo.note_title(n, tr("空白便签")) + "\n"
+                       + memo.when(n["updated"], tr("今天")))
+
+    def on_edit(self):
+        if self.nid:
+            html, text = self.edit.content()
+            self._html = html
+            self.store.set_content(self.nid, html, text, source=self)
+            self.update_item()
+            self.update_info()
+
+    def rename(self):
+        if self.nid:
+            self.store.set_title(self.nid, self.title.text(), source=self)
+            self.update_item()
+            self.update_info()
+
+    def start_rename(self):
+        if self.nid:
+            self.title.setFocus()
+            self.title.selectAll()
+
+    def list_menu(self, pos):
+        it = self.list.itemAt(pos)
+        if not it:
+            return
+        self.list.setCurrentItem(it)
+        n = self.store.get(self.nid)
+        m = QMenu(self)
+        m.addAction(tr("重命名"), self.start_rename)
+        m.addAction(tr("取消置顶") if n and n.get("pinned") else tr("置顶"), self.toggle_pin)
+        m.addAction(tr("在小窗中打开"), self.open_in_float)
+        m.addSeparator()
+        m.addAction(tr("删除"), self.delete_note)
+        m.exec(self.list.viewport().mapToGlobal(pos))
+
+    def on_store(self, nid, source):
+        if source is self or not self._shown:
+            return
+        if nid and nid == self.nid:
+            n = self.store.get(nid)
+            if n and (n.get("html") != self._html or (n.get("html") is None
+                                                       and n["text"] != self.edit.toPlainText())):
+                cur = self.edit.textCursor().position()
+                self.edit.load(n)
+                self._html = n.get("html")
+                c = self.edit.textCursor()
+                c.setPosition(min(cur, self.edit.document().characterCount() - 1))
+                self.edit.setTextCursor(c)
+            self.update_item()
+            self.update_info()
+        elif not nid:
+            self.refresh_list()
+
+    def new_note(self):
+        self.search.blockSignals(True)
+        self.search.clear()
+        self.search.blockSignals(False)
+        self.nid = self.store.new(source=self)["id"]
+        self.refresh_list()
+        self.edit.setFocus()
+
+    def toggle_pin(self):
+        n = self.store.get(self.nid)
+        if n:
+            self.store.set_pinned(self.nid, not n.get("pinned"), source=self)
+            self.refresh_list()
+
+    def open_in_float(self):
+        if self.nid:
+            self.main.open_memo_float(self.nid)
+
+    def delete_note(self):
+        n = self.store.get(self.nid)
+        if not n:
+            return
+        import memo
+        if (n["text"].strip() or n.get("html")) and not ConfirmDialog(self.main, "删除便签", tr("确定删除这条便签？删除后无法恢复。"),
+                                                   [memo.note_title(n, tr("空白便签"))], ok_text="删除").ask():
+            return
+        self.store.delete(self.nid, source=self)
+        self.nid = None
+        self.refresh_list()
 
 
 class TaskDialog(StyledDialog):
@@ -3441,6 +3980,9 @@ if __name__ == "__main__":
                 f.write("ERR " + repr(e))
         os._exit(0)
     app = QApplication(sys.argv)
+    import bridge
+    if bridge.forward_to_running(sys.argv[1:]):   # 已在运行：把文件 / 参数交给它，不再开第二个
+        os._exit(0)
     app.setWindowIcon(QIcon(os.path.join(ASSETS, "icon.ico")))
     try:
         with open(CONFIG, encoding="utf-8") as f:
@@ -3452,14 +3994,23 @@ if __name__ == "__main__":
     THEME = THEME if THEME in THEMES else "dark"
     app.setStyleSheet(build_qss(THEME))
     w = Main()
-    w.add_paths(sys.argv[1:])
+    w.bridge = bridge.Server(w)
+    w.bridge.received.connect(w.handle_cli)
+    cli = bridge.parse_args(sys.argv[1:], os.getcwd())
+    background = bool(cli["to"] or cli["min"])          # 其他软件调用转换：在后台转换，不弹主窗口
     app.setQuitOnLastWindowClosed(False)
-    w.show()
+    if background:
+        QTimer.singleShot(0, lambda: w.handle_cli(sys.argv[1:], os.getcwd()))
+    else:
+        w.add_paths(cli["paths"])
+        w.show()
+    w.write_integration()
     w.apply_ball()
+    w.apply_memo_float()
     QTimer.singleShot(3000, w.run_auto_delete)
     w.auto_timer = QTimer(w, interval=3600 * 1000, timeout=w.run_auto_delete)
     w.auto_timer.start()
-    if not w.cfg.get("guided"):
+    if not w.cfg.get("guided") and not background:
         QTimer.singleShot(400, w.open_guide)
     code = app.exec()
     os._exit(code)  # 直接结束进程，避免后台库线程拖住退出
